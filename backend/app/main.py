@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,14 +10,16 @@ from app.config import settings
 from app.db import init_db
 from app.routers.wallets import router as wallets_router
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     try:
         await init_db()
     except Exception:
-        # ponytail: API still serves mock path if Postgres is down during local UI work
-        pass
+        # API still serves analyze without TiDB; similarity/cache need a healthy DB.
+        logger.exception("init_db failed — persistence and similarity unavailable")
     yield
 
 

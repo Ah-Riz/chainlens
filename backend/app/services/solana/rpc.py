@@ -36,7 +36,7 @@ class SolanaRpc:
     async def get_transaction(self, signature: str) -> dict[str, Any] | None:
         return await self._call(
             "getTransaction",
-            [signature, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}],
+            [signature, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}],
         )
 
     async def get_balance(self, address: str) -> int:

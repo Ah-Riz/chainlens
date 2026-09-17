@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +24,37 @@ from app.services.embeddings import embed_text
 from app.services.llm import llm_summarize
 from app.services.solana import SolanaRpc, decode_transaction, fetch_balances
 from app.services.solana.decoder import ActivityEvent
+
+logger = logging.getLogger(__name__)
+
+
+async def _persist_analysis(
+    session: AsyncSession,
+    address: str,
+    summary: str,
+    stats: AnalyzeStats,
+    structured: StructuredAnalysis,
+    events: list[ActivityEvent],
+) -> None:
+    """Best-effort TiDB write — Analyze UX must not depend on DB availability."""
+    try:
+        embedding = await embed_text(summary)
+        await upsert_analysis(
+            session,
+            address,
+            summary,
+            stats.model_dump(),
+            structured.model_dump(),
+            embedding,
+        )
+        await upsert_transactions(session, address, events)
+        await session.commit()
+    except Exception:
+        logger.exception("Failed to persist analysis for %s", address)
+        try:
+            await session.rollback()
+        except Exception:
+            logger.exception("Rollback failed after persist error for %s", address)
 
 
 def _require_address(address: str) -> str:
@@ -158,17 +191,7 @@ async def summarize_wallet(address: str, session: AsyncSession | None = None) ->
     stats = _stats(events)
     summary, structured, mock = await llm_summarize(normalized, events, stats.protocols)
     if session is not None:
-        embedding = await embed_text(summary)
-        await upsert_analysis(
-            session,
-            normalized,
-            summary,
-            stats.model_dump(),
-            structured.model_dump(),
-            embedding,
-        )
-        await upsert_transactions(session, normalized, events)
-        await session.commit()
+        await _persist_analysis(session, normalized, summary, stats, structured, events)
     return SummaryResponse(address=normalized, summary=summary, structured=structured, mock=mock)
 
 
@@ -184,17 +207,7 @@ async def analyze_wallet(address: str, session: AsyncSession | None = None) -> A
     summary, structured, mock = await llm_summarize(normalized, events, stats.protocols)
 
     if session is not None:
-        embedding = await embed_text(summary)
-        await upsert_analysis(
-            session,
-            normalized,
-            summary,
-            stats.model_dump(),
-            structured.model_dump(),
-            embedding,
-        )
-        await upsert_transactions(session, normalized, events)
-        await session.commit()
+        await _persist_analysis(session, normalized, summary, stats, structured, events)
 
     return AnalyzeResponse(
         address=normalized,
