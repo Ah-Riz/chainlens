@@ -36,7 +36,7 @@ export type AnalyzeResponse = {
   mock: boolean;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "");
 
 export async function analyzeWallet(address: string): Promise<AnalyzeResponse> {
   const res = await fetch(`${API_BASE}/analyze`, {

@@ -3,11 +3,12 @@
 @tailwind utilities;
 
 :root {
-  --color-background: #f7f6f3;
-  --color-surface: #ffffff;
-  --color-text: #111111;
-  --color-text-muted: #787774;
-  --color-border: #eaeaea;
+  --color-background: #e6ebef;
+  --color-surface: #f4f7f9;
+  --color-text: #0b1220;
+  --color-text-muted: #5a6a7a;
+  --color-border: #c5d0da;
+  --color-accent: #0f766e;
 }
 
 html {
@@ -17,14 +18,18 @@ html {
 body {
   background: var(--color-background);
   color: var(--color-text);
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
   line-height: 1.6;
 }
 
 .font-display,
 h1,
 h2 {
-  font-family: "Newsreader", Georgia, serif;
+  font-family: "Sora", system-ui, sans-serif;
+}
+
+.panel {
+  @apply rounded-lg border border-line bg-surface p-6 transition hover:shadow-lift;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -34,6 +39,10 @@ h2 {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .scan-track::after {
+    display: none !important;
   }
 }
 
@@ -52,17 +61,29 @@ h2 {
   animation: fade-up 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.wallet-adapter-button {
-  background-color: #111111 !important;
-  border-radius: 6px !important;
-  font-family: inherit !important;
-  height: 44px !important;
+.scan-track {
+  position: relative;
+  overflow: hidden;
+  height: 3px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
-.wallet-adapter-button:hover {
-  background-color: #333333 !important;
+.scan-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+  animation: scan-sweep 2.2s ease-in-out infinite;
 }
 
-.wallet-adapter-modal-wrapper {
-  background: rgba(17, 17, 17, 0.4) !important;
+@keyframes scan-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
 }
