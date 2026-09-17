@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import json
-import time
-from urllib.parse import urlparse
-
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -43,30 +39,5 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
-    @property
-    def database_url_scheme(self) -> str:
-        return urlparse(self.database_url).scheme
-
 
 settings = Settings()
-
-# #region agent log
-try:
-    _payload = {
-        "sessionId": "6a98e1",
-        "hypothesisId": "A",
-        "location": "config.py:settings",
-        "message": "database_url scheme after normalize",
-        "data": {"scheme": settings.database_url_scheme},
-        "timestamp": int(time.time() * 1000),
-    }
-    print(f"[chainlens-debug] {_payload}", flush=True)
-    with open(
-        "/home/lana/Documents/cari_kerja/small_projects/1.chainlens/.cursor/debug-6a98e1.log",
-        "a",
-        encoding="utf-8",
-    ) as _f:
-        _f.write(json.dumps(_payload) + "\n")
-except Exception:
-    pass
-# #endregion

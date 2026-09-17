@@ -10,24 +10,6 @@ from tidb_vector.sqlalchemy import VectorType
 
 from app.config import settings
 
-# #region agent log
-try:
-    import json as _json
-    import time as _time
-
-    _p = {
-        "sessionId": "6a98e1",
-        "hypothesisId": "A",
-        "location": "models.py:create_async_engine",
-        "message": "creating engine",
-        "data": {"scheme": settings.database_url_scheme},
-        "timestamp": int(_time.time() * 1000),
-    }
-    print(f"[chainlens-debug] {_p}", flush=True)
-except Exception:
-    pass
-# #endregion
-
 # TiDB Cloud: mysql+asyncmy://user:pass@gateway/db?ssl=true
 engine = create_async_engine(
     settings.database_url,
