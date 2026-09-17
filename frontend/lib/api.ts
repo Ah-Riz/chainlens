@@ -33,6 +33,10 @@ export type AnalyzeResponse = {
       counterparty_label: string | null;
     }[];
   };
+  intelligence: {
+    label: string;
+    signals: string[];
+  };
   mock: boolean;
 };
 

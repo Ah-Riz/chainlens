@@ -5,6 +5,9 @@ export function Overview({ result }: { result: AnalyzeResponse }) {
     <section className="panel reveal sm:col-span-2" style={{ animationDelay: "40ms" }}>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <h2 className="font-display text-xl font-semibold tracking-[-0.02em]">Overview</h2>
+        <span className="rounded border border-line bg-pale-teal px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-accent">
+          {result.intelligence.label}
+        </span>
         {result.mock && (
           <span className="rounded border border-line bg-pale-yellow px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-amber">
             Rule-based summary

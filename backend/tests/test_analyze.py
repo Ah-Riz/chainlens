@@ -4,6 +4,7 @@ os.environ["MOCK_ANALYZE"] = "true"
 
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.main import app
 
 client = TestClient(app)
@@ -19,6 +20,7 @@ def test_health() -> None:
 
 
 def test_analyze_mock() -> None:
+    settings.mock_analyze = True
     res = client.post("/analyze", json={"address": ADDRESS})
     assert res.status_code == 200
     body = res.json()
@@ -26,6 +28,8 @@ def test_analyze_mock() -> None:
     assert body["address"] == ADDRESS
     assert "summary" in body
     assert len(body["transactions"]) >= 1
+    assert body["intelligence"]["label"] == "trader"
+    assert "swap_heavy" in body["intelligence"]["signals"]
 
 
 def test_analyze_invalid() -> None:

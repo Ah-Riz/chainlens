@@ -30,6 +30,11 @@ class StructuredAnalysis(BaseModel):
     notable_transfers: list[NotableTransfer]
 
 
+class WalletIntelligence(BaseModel):
+    label: str
+    signals: list[str] = Field(default_factory=list)
+
+
 class TokenBalance(BaseModel):
     mint: str
     symbol: str
@@ -53,6 +58,7 @@ class AnalyzeResponse(BaseModel):
     balances: list[TokenBalance] = Field(default_factory=list)
     transactions: list[TransactionItem] = Field(default_factory=list)
     structured: StructuredAnalysis
+    intelligence: WalletIntelligence
     mock: bool = False
 
 

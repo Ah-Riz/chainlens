@@ -17,10 +17,12 @@ from app.schemas import (
     TokenBalance,
     TransactionItem,
     TransactionsResponse,
+    WalletIntelligence,
 )
 from app.services.address import is_valid_solana_address, normalize_address
 from app.services.cache import upsert_analysis, upsert_transactions
 from app.services.embeddings import embed_text
+from app.services.intelligence import classify_wallet
 from app.services.llm import llm_summarize
 from app.services.solana import SolanaRpc, decode_transaction, fetch_balances
 from app.services.solana.decoder import ActivityEvent
@@ -155,6 +157,7 @@ def _mock_response(address: str) -> AnalyzeResponse:
                 )
             ],
         ),
+        intelligence=WalletIntelligence(label="trader", signals=["swap_heavy"]),
         mock=True,
     )
 
@@ -205,6 +208,7 @@ async def analyze_wallet(address: str, session: AsyncSession | None = None) -> A
     balances = await fetch_balances(normalized)
     stats = _stats(events)
     summary, structured, mock = await llm_summarize(normalized, events, stats.protocols)
+    intelligence = classify_wallet(events, stats, balances)
 
     if session is not None:
         await _persist_analysis(session, normalized, summary, stats, structured, events)
@@ -216,5 +220,6 @@ async def analyze_wallet(address: str, session: AsyncSession | None = None) -> A
         balances=balances,
         transactions=_events_to_items(events),
         structured=structured,
+        intelligence=intelligence,
         mock=mock,
     )
