@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-background: #f7f6f3;
+  --color-surface: #ffffff;
+  --color-text: #111111;
+  --color-text-muted: #787774;
+  --color-border: #eaeaea;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+}
+
+.font-display,
+h1,
+h2 {
+  font-family: "Newsreader", Georgia, serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal {
+  animation: fade-up 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.wallet-adapter-button {
+  background-color: #111111 !important;
+  border-radius: 6px !important;
+  font-family: inherit !important;
+  height: 44px !important;
+}
+
+.wallet-adapter-button:hover {
+  background-color: #333333 !important;
+}
+
+.wallet-adapter-modal-wrapper {
+  background: rgba(17, 17, 17, 0.4) !important;
+}

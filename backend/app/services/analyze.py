@@ -1,0 +1,207 @@
+from __future__ import annotations
+
+from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import settings
+from app.schemas import (
+    AnalyzeResponse,
+    AnalyzeStats,
+    BalancesResponse,
+    NotableTransfer,
+    ProtocolInteraction,
+    StructuredAnalysis,
+    SummaryResponse,
+    TokenBalance,
+    TransactionItem,
+    TransactionsResponse,
+)
+from app.services.address import is_valid_solana_address, normalize_address
+from app.services.cache import upsert_analysis, upsert_transactions
+from app.services.embeddings import embed_text
+from app.services.llm import llm_summarize
+from app.services.solana import SolanaRpc, decode_transaction, fetch_balances
+from app.services.solana.decoder import ActivityEvent
+
+
+def _require_address(address: str) -> str:
+    if not is_valid_solana_address(address):
+        raise HTTPException(status_code=400, detail="Invalid Solana address")
+    return normalize_address(address)
+
+
+def _events_to_items(events: list[ActivityEvent]) -> list[TransactionItem]:
+    return [
+        TransactionItem(
+            signature=e.signature,
+            type=e.tx_type,
+            description=e.description,
+            timestamp=e.timestamp,
+            programs=e.programs,
+            slot=e.slot,
+        )
+        for e in events
+    ]
+
+
+def _stats(events: list[ActivityEvent]) -> AnalyzeStats:
+    counterparties: set[str] = set()
+    protocols: list[str] = []
+    seen: set[str] = set()
+    for e in events:
+        counterparties.update(e.counterparties)
+        for p in e.programs:
+            if p not in seen and not p.endswith("…"):
+                seen.add(p)
+                protocols.append(p)
+    return AnalyzeStats(
+        tx_count=len(events),
+        unique_counterparties=len(counterparties),
+        protocols=protocols[:12],
+    )
+
+
+async def fetch_activity(address: str) -> list[ActivityEvent]:
+    rpc = SolanaRpc()
+    sigs = await rpc.get_signatures_for_address(address, settings.tx_fetch_limit)
+    events: list[ActivityEvent] = []
+    for entry in sigs:
+        signature = entry.get("signature")
+        if not signature:
+            continue
+        tx = await rpc.get_transaction(signature)
+        events.append(decode_transaction(signature, tx, address))
+    return events
+
+
+def _mock_response(address: str) -> AnalyzeResponse:
+    return AnalyzeResponse(
+        address=address,
+        summary=(
+            "This wallet swapped SOL for USDC via Jupiter, received SPL tokens, "
+            "and interacted with the System Program. "
+            "(Mock — set MOCK_ANALYZE=false and configure SOLANA_RPC_URL + OPENAI_API_KEY.)"
+        ),
+        stats=AnalyzeStats(tx_count=12, unique_counterparties=5, protocols=["Jupiter", "SPL Token"]),
+        balances=[
+            TokenBalance(mint="So11111111111111111111111111111111111111112", symbol="SOL", amount="2.5", decimals=9),
+            TokenBalance(
+                mint="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                symbol="USDC",
+                amount="150.00",
+                decimals=6,
+            ),
+        ],
+        transactions=[
+            TransactionItem(
+                signature="MockSig111111111111111111111111111111111111111111111111111111111",
+                type="SWAP_HINT",
+                description="Likely swap via Jupiter",
+                timestamp=1700000000,
+                programs=["Jupiter", "SPL Token"],
+            ),
+            TransactionItem(
+                signature="MockSig222222222222222222222222222222222222222222222222222222222",
+                type="SOL_TRANSFER",
+                description="received 1.0000 SOL",
+                timestamp=1699990000,
+                programs=["System Program"],
+            ),
+        ],
+        structured=StructuredAnalysis(
+            protocol_interactions=[
+                ProtocolInteraction(name="Jupiter", count=3),
+                ProtocolInteraction(name="SPL Token", count=5),
+            ],
+            notable_transfers=[
+                NotableTransfer(
+                    direction="in",
+                    asset="SOL",
+                    amount="1.0",
+                    counterparty_label="external wallet",
+                )
+            ],
+        ),
+        mock=True,
+    )
+
+
+async def get_transactions(address: str) -> TransactionsResponse:
+    normalized = _require_address(address)
+    if settings.mock_analyze:
+        mock = _mock_response(normalized)
+        return TransactionsResponse(address=normalized, transactions=mock.transactions)
+    events = await fetch_activity(normalized)
+    return TransactionsResponse(address=normalized, transactions=_events_to_items(events))
+
+
+async def get_balances(address: str) -> BalancesResponse:
+    normalized = _require_address(address)
+    if settings.mock_analyze:
+        mock = _mock_response(normalized)
+        return BalancesResponse(address=normalized, balances=mock.balances)
+    balances = await fetch_balances(normalized)
+    return BalancesResponse(address=normalized, balances=balances)
+
+
+async def summarize_wallet(address: str, session: AsyncSession | None = None) -> SummaryResponse:
+    normalized = _require_address(address)
+    if settings.mock_analyze:
+        mock = _mock_response(normalized)
+        return SummaryResponse(
+            address=normalized,
+            summary=mock.summary,
+            structured=mock.structured,
+            mock=True,
+        )
+    events = await fetch_activity(normalized)
+    stats = _stats(events)
+    summary, structured, mock = await llm_summarize(normalized, events, stats.protocols)
+    if session is not None:
+        embedding = await embed_text(summary)
+        await upsert_analysis(
+            session,
+            normalized,
+            summary,
+            stats.model_dump(),
+            structured.model_dump(),
+            embedding,
+        )
+        await upsert_transactions(session, normalized, events)
+        await session.commit()
+    return SummaryResponse(address=normalized, summary=summary, structured=structured, mock=mock)
+
+
+async def analyze_wallet(address: str, session: AsyncSession | None = None) -> AnalyzeResponse:
+    normalized = _require_address(address)
+
+    if settings.mock_analyze:
+        return _mock_response(normalized)
+
+    events = await fetch_activity(normalized)
+    balances = await fetch_balances(normalized)
+    stats = _stats(events)
+    summary, structured, mock = await llm_summarize(normalized, events, stats.protocols)
+
+    if session is not None:
+        embedding = await embed_text(summary)
+        await upsert_analysis(
+            session,
+            normalized,
+            summary,
+            stats.model_dump(),
+            structured.model_dump(),
+            embedding,
+        )
+        await upsert_transactions(session, normalized, events)
+        await session.commit()
+
+    return AnalyzeResponse(
+        address=normalized,
+        summary=summary,
+        stats=stats,
+        balances=balances,
+        transactions=_events_to_items(events),
+        structured=structured,
+        mock=mock,
+    )
