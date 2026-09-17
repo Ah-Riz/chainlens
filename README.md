@@ -116,15 +116,17 @@ Cloudflare Pages → project **chainlens** → **Custom domains**. CNAME `chainl
 
 ### Cloudflare Pages (Git-connected build)
 
-App code lives under `frontend/`. If Root Directory is empty, `npm ci` fails (no `package-lock.json` at repo root).
+Monorepo: Next app is under `frontend/`. Prefer **empty** Root directory and build via the repo root script (avoids missing `package-lock.json` at `/`).
 
 | Setting | Value |
 |---------|--------|
-| **Root directory** | `frontend` |
-| **Framework preset** | Next.js (Static HTML Export) or None |
-| **Build command** | `npm ci && npm run build` |
-| **Build output directory** | `out` |
+| **Root directory** | *(leave empty)* |
+| **Framework preset** | None |
+| **Build command** | `npm run pages:build` |
+| **Build output directory** | `frontend/out` |
 | **Env** `NEXT_PUBLIC_API_URL` | your Render `https://….onrender.com` |
+
+Alternative: Root directory `frontend`, build `npm ci && npm run build`, output `out`.
 
 ### First-time order
 
