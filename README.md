@@ -149,7 +149,7 @@ cd backend && pytest
 - Full DEX IDL decoding
 - Auth / rate limits / Redis
 - Autonomous agents
-- AWS App Runner
+- Paid AWS App Runner hosting
 
 ## License
 

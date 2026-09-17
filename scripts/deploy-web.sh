@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-API_URL="${NEXT_PUBLIC_API_URL:?Set NEXT_PUBLIC_API_URL to the App Runner HTTPS URL}"
+API_URL="${NEXT_PUBLIC_API_URL:?Set NEXT_PUBLIC_API_URL to your Render HTTPS URL}"
 
 cd "${ROOT}/frontend"
 NEXT_PUBLIC_API_URL="${API_URL}" npm run build

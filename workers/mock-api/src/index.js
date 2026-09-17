@@ -1,11 +1,11 @@
 /**
  * Temporary edge mock of ChainLens API so Pages can demo without AWS.
- * Replace NEXT_PUBLIC_API_URL with App Runner once scripts/deploy-api.sh succeeds.
+ * Replace NEXT_PUBLIC_API_URL with the Render FastAPI URL for live Solana + TiDB.
  */
 const MOCK = {
   address: "11111111111111111111111111111111",
   summary:
-    "This wallet swapped SOL for USDC via Jupiter, received SPL tokens, and interacted with the System Program. (Edge mock — deploy FastAPI to App Runner for live Solana + TiDB.)",
+    "This wallet swapped SOL for USDC via Jupiter, received SPL tokens, and interacted with the System Program. (Edge mock — point NEXT_PUBLIC_API_URL at Render FastAPI for live Solana + TiDB.)",
   stats: { tx_count: 12, unique_counterparties: 5, protocols: ["Jupiter", "SPL Token"] },
   balances: [
     {
