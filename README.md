@@ -71,7 +71,8 @@ Open http://localhost:3000 — API docs at http://localhost:8000/docs
 ### Backend → Render (free)
 
 1. Open [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint** → connect `Ah-Riz/chainlens`.
-2. Apply [`render.yaml`](render.yaml) (service `chainlens-api`, Docker, free plan).
+2. Apply [`render.yaml`](render.yaml) (service `chainlens-api`, Python, `rootDir: backend`, free plan).
+   - If you already created a Web Service manually: set **Root Directory** to `backend`, build `pip install -r requirements.txt`, start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
 3. In the service **Environment**, set:
    - `DATABASE_URL` — TiDB `mysql+asyncmy://...?ssl=true`
    - `OPENAI_API_KEY` — optional if `MOCK_ANALYZE=true`
