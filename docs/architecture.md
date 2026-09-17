@@ -35,9 +35,10 @@ flowchart LR
 | Layer | Host |
 |-------|------|
 | Frontend | Cloudflare Pages — https://chainlens.ahmadmaulana.net |
-| API (interim mock) | Cloudflare Worker — https://chainlens-api.ahmadrizkimaulana666.workers.dev |
-| API (Python / live) | AWS App Runner via `scripts/deploy-api.sh` (requires `aws login`) |
+| API | Render free Web Service (`render.yaml`) |
+| API (optional mock) | Cloudflare Worker |
 | DB | TiDB Cloud Starter |
+
 
 ## Error handling
 

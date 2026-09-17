@@ -10,4 +10,5 @@ NEXT_PUBLIC_API_URL="${API_URL}" npm run build
 ./node_modules/.bin/wrangler pages deploy out --project-name=chainlens --commit-dirty=true
 
 echo "Pages: https://chainlens.ahmadmaulana.net (also https://chainlens-8or.pages.dev)"
-echo "Remember CORS_ORIGINS on the API includes https://chainlens.ahmadmaulana.net"
+echo "Set NEXT_PUBLIC_API_URL to your Render URL (https://….onrender.com)."
+echo "Remember CORS_ORIGINS on Render includes https://chainlens.ahmadmaulana.net"
