@@ -114,11 +114,24 @@ Push to `main` runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and [
 
 Cloudflare Pages → project **chainlens** → **Custom domains**. CNAME `chainlens` → `chainlens-8or.pages.dev` if DNS is external.
 
+### Cloudflare Pages (Git-connected build)
+
+App code lives under `frontend/`. If Root Directory is empty, `npm ci` fails (no `package-lock.json` at repo root).
+
+| Setting | Value |
+|---------|--------|
+| **Root directory** | `frontend` |
+| **Framework preset** | Next.js (Static HTML Export) or None |
+| **Build command** | `npm ci && npm run build` |
+| **Build output directory** | `out` |
+| **Env** `NEXT_PUBLIC_API_URL` | your Render `https://….onrender.com` |
+
 ### First-time order
 
 1. Create Render service from Blueprint; set env; wait until live.
-2. Set GitHub `NEXT_PUBLIC_API_URL` to the Render HTTPS URL.
-3. Ensure Cloudflare secrets exist; push `main` (or re-run **Deploy**) so Pages rebuilds against Render.
+2. Set GitHub `NEXT_PUBLIC_API_URL` to the Render HTTPS URL (Actions) **and/or** the same var in Pages → Settings → Environment variables.
+3. Ensure Cloudflare Pages **Root directory** is `frontend`, then redeploy.
+4. Optional: GitHub Actions Deploy with `CLOUDFLARE_*` secrets also publishes Pages via Wrangler.
 
 ## API
 
