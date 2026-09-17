@@ -58,7 +58,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SOLANA_RPC_URL: ${{ vars.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com' }}
           MOCK_ANALYZE: ${{ vars.MOCK_ANALYZE || 'true' }}
-          CORS_ORIGINS: ${{ vars.CORS_ORIGINS || 'https://chainlens-8or.pages.dev' }}
+          CORS_ORIGINS: ${{ vars.CORS_ORIGINS || 'https://chainlens.ahmadmaulana.net,https://chainlens-8or.pages.dev' }}
         run: |
           set -euo pipefail
           if [[ -z "${ACCESS_ROLE:-}" ]]; then

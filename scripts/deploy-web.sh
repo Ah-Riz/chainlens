@@ -9,5 +9,5 @@ cd "${ROOT}/frontend"
 NEXT_PUBLIC_API_URL="${API_URL}" npm run build
 ./node_modules/.bin/wrangler pages deploy out --project-name=chainlens --commit-dirty=true
 
-echo "Pages: https://chainlens-8or.pages.dev"
-echo "Remember CORS_ORIGINS on the API includes this origin."
+echo "Pages: https://chainlens.ahmadmaulana.net (also https://chainlens-8or.pages.dev)"
+echo "Remember CORS_ORIGINS on the API includes https://chainlens.ahmadmaulana.net"

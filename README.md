@@ -6,6 +6,7 @@ Portfolio MVP: Solana RPC → instruction parsing → LLM explanations → TiDB 
 
 | Surface | URL |
 |---------|-----|
+| Frontend (custom domain) | https://chainlens.ahmadmaulana.net |
 | Frontend (Cloudflare Pages) | https://chainlens-8or.pages.dev |
 | API (Cloudflare Worker mock, interim) | https://chainlens-api.ahmadrizkimaulana666.workers.dev |
 | Python API (AWS App Runner) | Via GitHub Actions Deploy workflow (see below) |
@@ -94,11 +95,23 @@ Manual fallbacks remain in [`scripts/deploy-api.sh`](scripts/deploy-api.sh) and 
 | Name | Example |
 |------|---------|
 | `AWS_REGION` | `ap-southeast-3` |
-| `CORS_ORIGINS` | `https://chainlens-8or.pages.dev` |
+| `CORS_ORIGINS` | `https://chainlens.ahmadmaulana.net,https://chainlens-8or.pages.dev` |
 | `MOCK_ANALYZE` | `true` |
 | `SOLANA_RPC_URL` | `https://api.mainnet-beta.solana.com` |
-| `NEXT_PUBLIC_API_URL` | Start with `https://chainlens-api.ahmadrizkimaulana666.workers.dev`, then switch to `https://….awsapprunner.com` after the first API deploy |
+| `NEXT_PUBLIC_API_URL` | Start with `https://chainlens-api.ahmadrizkimaulana666.workers.dev`, then switch to `https://….awsapprunner.com` (or later `https://api.chainlens.ahmadmaulana.net` if you CNAME the API) |
 | `APP_RUNNER_ECR_ACCESS_ROLE_ARN` | `arn:aws:iam::ACCOUNT:role/AppRunnerECRAccessRole` |
+
+### Custom domain DNS (`chainlens.ahmadmaulana.net`)
+
+In Cloudflare Pages → project **chainlens** → **Custom domains** → add `chainlens.ahmadmaulana.net`.
+
+If DNS for `ahmadmaulana.net` is on Cloudflare (recommended), Pages can auto-create the record. Otherwise at your DNS host:
+
+| Type | Name | Target |
+|------|------|--------|
+| CNAME | `chainlens` | `chainlens-8or.pages.dev` |
+
+Keep HTTPS on; wait for the certificate to become **Active**. Set GitHub variable `CORS_ORIGINS` to include `https://chainlens.ahmadmaulana.net`.
 
 ### First-time order
 
