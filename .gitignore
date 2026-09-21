@@ -33,3 +33,6 @@ htmlcov/
 
 # Docker
 postgres-data/
+
+# Graphify knowledge graph output
+graphify-out/

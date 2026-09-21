@@ -27,7 +27,9 @@ def test_analyze_mock() -> None:
     assert body["mock"] is True
     assert body["address"] == ADDRESS
     assert "summary" in body
+    assert "trader" in body["summary"].lower()
     assert len(body["transactions"]) >= 1
+    assert len(body["structured"]["notable_transfers"]) >= 1
     assert body["intelligence"]["label"] == "trader"
     assert "swap_heavy" in body["intelligence"]["signals"]
 

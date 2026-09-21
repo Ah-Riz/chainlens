@@ -113,8 +113,9 @@ def _mock_response(address: str) -> AnalyzeResponse:
     return AnalyzeResponse(
         address=address,
         summary=(
-            "This wallet swapped SOL for USDC via Jupiter, received SPL tokens, "
-            "and interacted with the System Program. "
+            "This wallet reads as a trader with swap-heavy recent activity.\n"
+            "It swapped SOL for USDC via Jupiter, received SPL tokens, "
+            "and holds ~2.5 SOL plus 150 USDC.\n"
             "(Mock — set MOCK_ANALYZE=false and configure SOLANA_RPC_URL + OPENAI_API_KEY.)"
         ),
         stats=AnalyzeStats(tx_count=12, unique_counterparties=5, protocols=["Jupiter", "SPL Token"]),
@@ -191,8 +192,12 @@ async def summarize_wallet(address: str, session: AsyncSession | None = None) ->
             mock=True,
         )
     events = await fetch_activity(normalized)
+    balances = await fetch_balances(normalized)
     stats = _stats(events)
-    summary, structured, mock = await llm_summarize(normalized, events, stats.protocols)
+    intelligence = classify_wallet(events, stats, balances)
+    summary, structured, mock = await llm_summarize(
+        normalized, events, stats.protocols, stats, balances, intelligence
+    )
     if session is not None:
         await _persist_analysis(session, normalized, summary, stats, structured, events)
     return SummaryResponse(address=normalized, summary=summary, structured=structured, mock=mock)
@@ -207,8 +212,10 @@ async def analyze_wallet(address: str, session: AsyncSession | None = None) -> A
     events = await fetch_activity(normalized)
     balances = await fetch_balances(normalized)
     stats = _stats(events)
-    summary, structured, mock = await llm_summarize(normalized, events, stats.protocols)
     intelligence = classify_wallet(events, stats, balances)
+    summary, structured, mock = await llm_summarize(
+        normalized, events, stats.protocols, stats, balances, intelligence
+    )
 
     if session is not None:
         await _persist_analysis(session, normalized, summary, stats, structured, events)
