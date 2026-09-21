@@ -40,6 +40,11 @@ const MOCK = {
       { direction: "in", asset: "SOL", amount: "1.0", counterparty_label: "external wallet" },
     ],
   },
+  intelligence: { label: "trader", signals: ["swap_heavy"] },
+  account_kind: "wallet",
+  owner_program: "11111111111111111111111111111111",
+  owner_label: "System Program",
+  what_is_this: "This looks like a wallet (user account).",
   mock: true,
 };
 

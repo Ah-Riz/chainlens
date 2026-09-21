@@ -1,19 +1,47 @@
 import { AnalyzeResponse } from "@/lib/api";
 
+const KIND_LABEL: Record<string, string> = {
+  wallet: "Wallet",
+  program: "Program",
+  token_mint: "Token mint",
+  token_account: "Token account",
+  protocol_account: "Protocol account",
+  unknown: "Unknown",
+};
+
 export function Overview({ result }: { result: AnalyzeResponse }) {
+  const kind = result.account_kind || "wallet";
+  const showPersona = kind === "wallet" && result.intelligence.label !== "wallet";
+
   return (
     <section className="panel reveal sm:col-span-2" style={{ animationDelay: "40ms" }}>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <h2 className="font-display text-xl font-semibold tracking-[-0.02em]">Overview</h2>
         <span className="rounded border border-line bg-pale-teal px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-accent">
-          {result.intelligence.label}
+          {KIND_LABEL[kind] ?? kind}
         </span>
+        {showPersona && (
+          <span className="rounded border border-line bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
+            {result.intelligence.label}
+          </span>
+        )}
+        {result.owner_label && kind === "protocol_account" && (
+          <span className="rounded border border-line bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
+            Owned by {result.owner_label}
+          </span>
+        )}
+        {result.owner_label && kind === "program" && (
+          <span className="rounded border border-line bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
+            {result.owner_label}
+          </span>
+        )}
         {result.mock && (
           <span className="rounded border border-line bg-pale-yellow px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-amber">
             Rule-based summary
           </span>
         )}
       </div>
+      <p className="mb-3 text-base leading-relaxed text-ink">{result.what_is_this}</p>
       <p className="mb-5 break-all font-mono text-xs text-muted">{result.address}</p>
       <dl className="grid gap-6 sm:grid-cols-3">
         <div>

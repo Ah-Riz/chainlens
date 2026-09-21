@@ -26,3 +26,14 @@ def test_fresh() -> None:
     stats = AnalyzeStats(tx_count=1, unique_counterparties=1, protocols=["System Program"])
     intel = classify_wallet(events, stats, [TokenBalance(mint="x", symbol="SOL", amount="1")])
     assert intel.label == "fresh"
+
+
+def test_program_skips_trader() -> None:
+    events = [
+        ActivityEvent(signature=f"s{i}", tx_type="SWAP_HINT", description="swap", timestamp=1_700_000_000 + i)
+        for i in range(6)
+    ]
+    stats = AnalyzeStats(tx_count=6, unique_counterparties=2, protocols=["Jupiter"])
+    intel = classify_wallet(events, stats, [], account_kind="program")
+    assert intel.label == "program"
+    assert "swap_heavy" not in intel.signals

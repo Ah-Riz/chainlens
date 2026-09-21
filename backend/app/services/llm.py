@@ -73,6 +73,9 @@ def rule_based_summary(
     stats: AnalyzeStats | None = None,
     balances: list[TokenBalance] | None = None,
     intelligence: WalletIntelligence | None = None,
+    account_kind: str = "wallet",
+    owner_label: str | None = None,
+    what_is_this: str | None = None,
 ) -> tuple[str, StructuredAnalysis]:
     tx_count = stats.tx_count if stats else len(events)
     counterparties = stats.unique_counterparties if stats else 0
@@ -81,14 +84,46 @@ def rule_based_summary(
         type_counts[e.tx_type] = type_counts.get(e.tx_type, 0) + 1
 
     short = f"{address[:4]}…{address[-4:]}"
-    if tx_count == 0:
-        parts = [f"Wallet {short} looks inactive in the fetched window — no recent transactions."]
+    intro = what_is_this or "This looks like a wallet (user account)."
+    parts: list[str] = [intro]
+
+    if account_kind != "wallet":
+        noun = {
+            "program": "program",
+            "token_mint": "token mint",
+            "token_account": "token account",
+            "protocol_account": "protocol account",
+            "unknown": "address",
+        }.get(account_kind, "address")
+        if tx_count == 0:
+            parts.append(f"No recent transactions mentioning this {noun} ({short}).")
+        else:
+            parts.append(
+                f"Recent activity involving this {noun} ({short}): "
+                f"{tx_count} txs across {counterparties} counterparties."
+            )
+            if owner_label and account_kind == "protocol_account":
+                parts.append(f"Owner program: {owner_label}.")
+            if protocols:
+                parts.append(f"Programs seen in those txs: {', '.join(protocols[:6])}.")
+            if type_counts.get("SWAP_HINT"):
+                parts.append(f"About {type_counts['SWAP_HINT']} look like DEX swaps.")
+            if type_counts.get("SPL_TRANSFER"):
+                parts.append(f"{type_counts['SPL_TRANSFER']} SPL token transfers.")
+            if type_counts.get("SOL_TRANSFER"):
+                parts.append(f"{type_counts['SOL_TRANSFER']} native SOL transfers.")
+            if intelligence and intelligence.signals:
+                parts.append(
+                    f"Signals: {', '.join(s.replace('_', ' ') for s in intelligence.signals)}."
+                )
+    elif tx_count == 0:
+        parts.append(f"Address {short} looks inactive in the fetched window — no recent transactions.")
     else:
         label = intelligence.label if intelligence else "mixed"
-        parts = [
+        parts.append(
             f"This wallet ({short}) reads as a {label} "
             f"with {tx_count} recent txs across {counterparties} counterparties."
-        ]
+        )
         if intelligence and intelligence.signals:
             parts.append(f"Signals: {', '.join(s.replace('_', ' ') for s in intelligence.signals)}.")
         if balances:
@@ -117,9 +152,15 @@ def _analyst_brief(
     stats: AnalyzeStats | None,
     balances: list[TokenBalance] | None,
     intelligence: WalletIntelligence | None,
+    account_kind: str,
+    owner_label: str | None,
+    what_is_this: str | None,
 ) -> dict[str, Any]:
     return {
         "address": address,
+        "account_kind": account_kind,
+        "owner_label": owner_label,
+        "what_is_this": what_is_this,
         "intelligence": {
             "label": intelligence.label if intelligence else None,
             "signals": list(intelligence.signals) if intelligence else [],
@@ -153,25 +194,45 @@ async def llm_summarize(
     stats: AnalyzeStats | None = None,
     balances: list[TokenBalance] | None = None,
     intelligence: WalletIntelligence | None = None,
+    account_kind: str = "wallet",
+    owner_label: str | None = None,
+    what_is_this: str | None = None,
 ) -> tuple[str, StructuredAnalysis, bool]:
     """Return summary, structured, mock_flag."""
+    kwargs = dict(
+        stats=stats,
+        balances=balances,
+        intelligence=intelligence,
+        account_kind=account_kind,
+        owner_label=owner_label,
+        what_is_this=what_is_this,
+    )
     if settings.mock_analyze or not settings.openai_api_key:
-        summary, structured = rule_based_summary(
-            address, events, protocols, stats, balances, intelligence
-        )
+        summary, structured = rule_based_summary(address, events, protocols, **kwargs)
         return summary, structured, True
 
     system = (
-        "You are ChainLens, a Solana wallet analyst. "
-        "Write for crypto users who already know Solana basics. "
-        "Lead with the wallet persona (label) from the brief, then cite 2–3 concrete "
-        "behaviors using protocols, amounts, and holdings from the brief only — never invent. "
+        "You are ChainLens, a Solana address analyst for newcomers and crypto users. "
+        "Always respect account_kind and what_is_this from the brief. "
+        "If account_kind is not wallet, NEVER call it a wallet or a trader — "
+        "describe it as a program, mint, token account, or protocol account as appropriate. "
+        "Lead with what the address is, then cite 2–3 concrete behaviors from the brief only — never invent. "
         "You may use short line breaks in summary for scannability. "
         "Respond with JSON only matching the schema."
     )
     user = json.dumps(
         {
-            "brief": _analyst_brief(address, events, protocols, stats, balances, intelligence),
+            "brief": _analyst_brief(
+                address,
+                events,
+                protocols,
+                stats,
+                balances,
+                intelligence,
+                account_kind,
+                owner_label,
+                what_is_this,
+            ),
             "schema": {
                 "summary": "string (1 short para + optional line breaks)",
                 "protocol_interactions": [{"name": "str", "count": "int"}],
@@ -201,9 +262,7 @@ async def llm_summarize(
         raw = res.choices[0].message.content or "{}"
         data: dict[str, Any] = json.loads(raw)
     except Exception:
-        summary, structured = rule_based_summary(
-            address, events, protocols, stats, balances, intelligence
-        )
+        summary, structured = rule_based_summary(address, events, protocols, **kwargs)
         return summary, structured, True
 
     interactions = [
@@ -222,6 +281,6 @@ async def llm_summarize(
         if isinstance(t, dict)
     ]
     summary = str(data.get("summary") or "").strip() or rule_based_summary(
-        address, events, protocols, stats, balances, intelligence
+        address, events, protocols, **kwargs
     )[0]
     return summary, StructuredAnalysis(protocol_interactions=interactions, notable_transfers=transfers), False

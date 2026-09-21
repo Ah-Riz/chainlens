@@ -59,6 +59,10 @@ class AnalyzeResponse(BaseModel):
     transactions: list[TransactionItem] = Field(default_factory=list)
     structured: StructuredAnalysis
     intelligence: WalletIntelligence
+    account_kind: str = "wallet"
+    owner_program: str | None = None
+    owner_label: str | None = None
+    what_is_this: str = "This looks like a wallet (user account)."
     mock: bool = False
 
 

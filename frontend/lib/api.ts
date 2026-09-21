@@ -37,6 +37,10 @@ export type AnalyzeResponse = {
     label: string;
     signals: string[];
   };
+  account_kind: string;
+  owner_program: string | null;
+  owner_label: string | null;
+  what_is_this: string;
   mock: boolean;
 };
 

@@ -6,7 +6,7 @@ import { analyzeWallet, AnalyzeResponse } from "@/lib/api";
 import { AnalyzeProgress } from "@/components/AnalyzeProgress";
 import { Overview } from "@/components/Overview";
 import { TokenBalances } from "@/components/TokenBalances";
-import { TxTimeline } from "@/components/TxTimeline";
+import { ActivityMix } from "@/components/ActivityMix";
 import { AiInsights } from "@/components/AiInsights";
 
 const EXAMPLE = "DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK";
@@ -52,10 +52,11 @@ export default function HomePage() {
           ChainLens
         </p>
         <h1 className="font-display text-3xl font-semibold leading-[1.15] tracking-[-0.03em] text-ink sm:text-4xl">
-          Solana wallet intelligence
+          Solana address intelligence
         </h1>
         <p className="max-w-xl text-muted">
-          Paste an address. ChainLens reads on-chain activity and explains it in plain language.
+          Paste any address — wallet, program, token, or vault. ChainLens explains what it is and
+          what recent activity looks like.
         </p>
       </header>
 
@@ -70,7 +71,7 @@ export default function HomePage() {
           onChange={(e) => setAddress(e.target.value)}
           placeholder="Solana address"
           spellCheck={false}
-          aria-label="Solana wallet address"
+          aria-label="Solana address"
           disabled={loading}
         />
         <button
@@ -109,8 +110,8 @@ export default function HomePage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <Overview result={result} />
           <AiInsights result={result} />
-          <TokenBalances balances={result.balances} />
-          <TxTimeline transactions={result.transactions} />
+          <TokenBalances balances={result.balances} accountKind={result.account_kind} />
+          <ActivityMix transactions={result.transactions} />
         </div>
       )}
     </main>

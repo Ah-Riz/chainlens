@@ -25,6 +25,11 @@ from app.services.embeddings import embed_text
 from app.services.intelligence import classify_wallet
 from app.services.llm import llm_summarize
 from app.services.solana import SolanaRpc, decode_transaction, fetch_balances
+from app.services.solana.account_kind import (
+    AccountClassification,
+    classify_with_address_label,
+    what_is_this_for,
+)
 from app.services.solana.decoder import ActivityEvent
 
 logger = logging.getLogger(__name__)
@@ -96,17 +101,31 @@ def _stats(events: list[ActivityEvent]) -> AnalyzeStats:
     )
 
 
-async def fetch_activity(address: str) -> list[ActivityEvent]:
-    rpc = SolanaRpc()
-    sigs = await rpc.get_signatures_for_address(address, settings.tx_fetch_limit)
+async def fetch_activity(address: str, rpc: SolanaRpc | None = None) -> list[ActivityEvent]:
+    client = rpc or SolanaRpc()
+    sigs = await client.get_signatures_for_address(address, settings.tx_fetch_limit)
     events: list[ActivityEvent] = []
     for entry in sigs:
         signature = entry.get("signature")
         if not signature:
             continue
-        tx = await rpc.get_transaction(signature)
+        tx = await client.get_transaction(signature)
         events.append(decode_transaction(signature, tx, address))
     return events
+
+
+async def _classify_address(address: str, rpc: SolanaRpc) -> AccountClassification:
+    try:
+        info = await rpc.get_account_info(address)
+    except Exception:
+        logger.exception("getAccountInfo failed for %s", address)
+        return AccountClassification(
+            kind="wallet",
+            owner_program=None,
+            owner_label=None,
+            what_is_this=what_is_this_for("wallet", None),
+        )
+    return classify_with_address_label(info, address)
 
 
 def _mock_response(address: str) -> AnalyzeResponse:
@@ -159,6 +178,10 @@ def _mock_response(address: str) -> AnalyzeResponse:
             ],
         ),
         intelligence=WalletIntelligence(label="trader", signals=["swap_heavy"]),
+        account_kind="wallet",
+        owner_program="11111111111111111111111111111111",
+        owner_label="System Program",
+        what_is_this=what_is_this_for("wallet", None),
         mock=True,
     )
 
@@ -191,12 +214,22 @@ async def summarize_wallet(address: str, session: AsyncSession | None = None) ->
             structured=mock.structured,
             mock=True,
         )
-    events = await fetch_activity(normalized)
-    balances = await fetch_balances(normalized)
+    rpc = SolanaRpc()
+    acct = await _classify_address(normalized, rpc)
+    events = await fetch_activity(normalized, rpc)
+    balances = await fetch_balances(normalized, rpc)
     stats = _stats(events)
-    intelligence = classify_wallet(events, stats, balances)
+    intelligence = classify_wallet(events, stats, balances, acct.kind)
     summary, structured, mock = await llm_summarize(
-        normalized, events, stats.protocols, stats, balances, intelligence
+        normalized,
+        events,
+        stats.protocols,
+        stats,
+        balances,
+        intelligence,
+        account_kind=acct.kind,
+        owner_label=acct.owner_label,
+        what_is_this=acct.what_is_this,
     )
     if session is not None:
         await _persist_analysis(session, normalized, summary, stats, structured, events)
@@ -209,12 +242,22 @@ async def analyze_wallet(address: str, session: AsyncSession | None = None) -> A
     if settings.mock_analyze:
         return _mock_response(normalized)
 
-    events = await fetch_activity(normalized)
-    balances = await fetch_balances(normalized)
+    rpc = SolanaRpc()
+    acct = await _classify_address(normalized, rpc)
+    events = await fetch_activity(normalized, rpc)
+    balances = await fetch_balances(normalized, rpc)
     stats = _stats(events)
-    intelligence = classify_wallet(events, stats, balances)
+    intelligence = classify_wallet(events, stats, balances, acct.kind)
     summary, structured, mock = await llm_summarize(
-        normalized, events, stats.protocols, stats, balances, intelligence
+        normalized,
+        events,
+        stats.protocols,
+        stats,
+        balances,
+        intelligence,
+        account_kind=acct.kind,
+        owner_label=acct.owner_label,
+        what_is_this=acct.what_is_this,
     )
 
     if session is not None:
@@ -228,5 +271,9 @@ async def analyze_wallet(address: str, session: AsyncSession | None = None) -> A
         transactions=_events_to_items(events),
         structured=structured,
         intelligence=intelligence,
+        account_kind=acct.kind,
+        owner_program=acct.owner_program,
+        owner_label=acct.owner_label,
+        what_is_this=acct.what_is_this,
         mock=mock,
     )

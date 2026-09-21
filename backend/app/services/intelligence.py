@@ -14,7 +14,14 @@ def classify_wallet(
     events: list[ActivityEvent],
     stats: AnalyzeStats,
     balances: list[TokenBalance],
+    account_kind: str = "wallet",
 ) -> WalletIntelligence:
+    if account_kind != "wallet":
+        signals = _signals(events, stats, balances, 0.0) if events else []
+        # Keep burst only — skip wallet-persona signals for non-wallets
+        signals = [s for s in signals if s == "burst_activity"]
+        return WalletIntelligence(label=account_kind, signals=signals)
+
     tx_count = stats.tx_count
     type_counts: dict[str, int] = {}
     for e in events:

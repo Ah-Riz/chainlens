@@ -39,6 +39,15 @@ class SolanaRpc:
             [signature, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}],
         )
 
+    async def get_account_info(self, address: str) -> dict[str, Any] | None:
+        result = await self._call(
+            "getAccountInfo",
+            [address, {"encoding": "jsonParsed"}],
+        )
+        if not result:
+            return None
+        return result.get("value")
+
     async def get_balance(self, address: str) -> int:
         result = await self._call("getBalance", [address])
         return int((result or {}).get("value", 0))

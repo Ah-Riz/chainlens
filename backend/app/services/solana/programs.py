@@ -18,6 +18,7 @@ PROGRAM_LABELS: dict[str, str] = {
     "Vote111111111111111111111111111111111111111": "Vote Program",
     "MarBmsSgKXdrN1egZf5lnkxbmVJuzry9CUy2V1MXfcw": "Marinade",
     "LendZqTs7gn5CTSJU1jWKhKuVpjJGom45nnwPb2AMTi": "Solend",
+    "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD": "KLend",
 }
 
 KNOWN_MINTS: dict[str, tuple[str, int]] = {

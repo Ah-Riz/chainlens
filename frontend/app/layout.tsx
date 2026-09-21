@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "ChainLens",
-  description: "AI-powered Solana wallet intelligence",
+  description: "AI-powered Solana address intelligence",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
