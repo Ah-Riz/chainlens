@@ -37,5 +37,8 @@ postgres-data/
 # Graphify knowledge graph output
 graphify-out/
 
+# Playwright MCP session artifacts
+.playwright-mcp/
+
 # TypeScript incremental build cache
 *.tsbuildinfo
