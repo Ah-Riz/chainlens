@@ -66,36 +66,3 @@ class AnalyzeResponse(BaseModel):
     mock: bool = False
     model: str | None = None
     fallback_used: bool = False
-
-
-class TransactionsResponse(BaseModel):
-    address: str
-    transactions: list[TransactionItem]
-
-
-class BalancesResponse(BaseModel):
-    address: str
-    balances: list[TokenBalance]
-
-
-class SummaryRequest(BaseModel):
-    address: str = Field(..., min_length=32, max_length=64)
-
-
-class SummaryResponse(BaseModel):
-    address: str
-    summary: str
-    structured: StructuredAnalysis
-    mock: bool = False
-    model: str | None = None
-    fallback_used: bool = False
-
-
-class SimilarAnalysisItem(BaseModel):
-    address: str
-    summary: str
-    distance: float
-
-
-class SimilarAnalysesResponse(BaseModel):
-    items: list[SimilarAnalysisItem]

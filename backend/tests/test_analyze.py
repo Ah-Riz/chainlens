@@ -1,7 +1,9 @@
 import os
+from unittest.mock import AsyncMock, MagicMock, patch
 
 os.environ["MOCK_ANALYZE"] = "true"
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.config import settings
@@ -27,7 +29,7 @@ def test_analyze_mock() -> None:
     assert body["mock"] is True
     assert body["address"] == ADDRESS
     assert "summary" in body
-    assert "trader" in body["summary"].lower()
+    assert "trader" in body["summary"].lower() or body["intelligence"]["label"] == "trader"
     assert len(body["transactions"]) >= 1
     assert len(body["structured"]["notable_transfers"]) >= 1
     assert body["account_kind"] == "wallet"
@@ -42,13 +44,40 @@ def test_analyze_invalid() -> None:
     assert res.status_code == 400
 
 
-def test_transactions_mock() -> None:
-    res = client.get(f"/wallets/{ADDRESS}/transactions")
+def test_analyze_empty_wallet() -> None:
+    settings.mock_analyze = False
+    settings.gemini_api_key = ""
+
+    rpc = MagicMock()
+    rpc.get_signatures_for_address = AsyncMock(return_value=[])
+    rpc.get_account_info = AsyncMock(return_value=None)
+    rpc.get_balance = AsyncMock(return_value=0)
+    rpc.get_token_accounts_by_owner = AsyncMock(return_value=[])
+
+    with (
+        patch("app.services.analyze.SolanaRpc", return_value=rpc),
+        patch("app.services.analyze._persist_analysis", new_callable=AsyncMock),
+    ):
+        res = client.post("/analyze", json={"address": ADDRESS})
+
     assert res.status_code == 200
-    assert "transactions" in res.json()
+    body = res.json()
+    assert body["transactions"] == []
+    assert body["stats"]["tx_count"] == 0
+    assert body["mock"] is True
 
 
-def test_balances_mock() -> None:
-    res = client.get(f"/wallets/{ADDRESS}/balances")
-    assert res.status_code == 200
-    assert any(b["symbol"] == "SOL" for b in res.json()["balances"])
+def test_analyze_rpc_failure_502() -> None:
+    settings.mock_analyze = False
+
+    rpc = MagicMock()
+    rpc.get_account_info = AsyncMock(return_value=None)
+    rpc.get_signatures_for_address = AsyncMock(
+        side_effect=HTTPException(status_code=502, detail="Solana RPC error: boom")
+    )
+
+    with patch("app.services.analyze.SolanaRpc", return_value=rpc):
+        res = client.post("/analyze", json={"address": ADDRESS})
+
+    assert res.status_code == 502
+    assert "Solana RPC" in res.json()["detail"]

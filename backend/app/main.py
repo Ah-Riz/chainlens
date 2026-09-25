@@ -18,8 +18,8 @@ async def lifespan(_app: FastAPI):
     try:
         await init_db()
     except Exception:
-        # API still serves analyze without TiDB; similarity/cache need a healthy DB.
-        logger.exception("init_db failed — persistence and similarity unavailable")
+        # API still serves analyze without TiDB; JSON cache needs a healthy DB.
+        logger.exception("init_db failed — persistence unavailable")
     yield
 
 

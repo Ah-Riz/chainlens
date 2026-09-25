@@ -1,6 +1,6 @@
 # ChainLens — AI-powered Solana wallet intelligence
 
-Portfolio MVP: Solana RPC → instruction parsing → LLM explanations → TiDB Cloud vectors.
+Portfolio MVP: Solana RPC → instruction parsing → LLM explanations → optional TiDB JSON cache.
 
 ## Live URLs
 
@@ -9,7 +9,6 @@ Portfolio MVP: Solana RPC → instruction parsing → LLM explanations → TiDB 
 | Frontend (custom domain) | https://chainlens.ahmadmaulana.net |
 | Frontend (Cloudflare Pages) | https://chainlens-8or.pages.dev |
 | API (Render free Web Service) | `https://chainlens-api-….onrender.com` (set after first Render deploy) |
-| API (Cloudflare Worker mock, optional) | https://chainlens-api.ahmadrizkimaulana666.workers.dev |
 
 ## Recruiter takeaway
 
@@ -17,11 +16,11 @@ Portfolio MVP: Solana RPC → instruction parsing → LLM explanations → TiDB 
 
 ## What it does
 
-- Connect a Solana wallet (Phantom / Solflare) or paste an address
+- Paste a Solana address
 - Fetch recent transactions via Solana JSON-RPC (`jsonParsed`)
 - Decode SPL transfers and common program interactions
-- Generate natural-language wallet summaries
-- Store analyses with vector embeddings for similarity search (TiDB Cloud)
+- Show activity mix, balances, and natural-language wallet summaries
+- Optionally cache analyses in TiDB Cloud when `DATABASE_URL` is set
 
 ## Architecture
 
@@ -31,8 +30,7 @@ See [docs/architecture.md](docs/architecture.md) and [docs/requirements.md](docs
 Wallet address
   → Solana RPC (signatures + txs + balances)
   → instruction decoder
-  → TiDB Cloud (JSON + VECTOR)
-  → Gemini structured summary
+  → Gemini structured summary (or rule-based mock)
   → FastAPI (Render) → Next.js (Cloudflare Pages)
 ```
 
@@ -40,18 +38,18 @@ Wallet address
 
 | Layer | Choice |
 |-------|--------|
-| Frontend | Next.js (static export), TypeScript, Tailwind, Wallet Adapter → Cloudflare Pages |
+| Frontend | Next.js (static export), TypeScript, Tailwind → Cloudflare Pages |
 | Backend | Python, FastAPI → Render (free Web Service) |
 | Chain | Solana JSON-RPC |
-| AI | Google Gemini chat + embeddings |
-| DB | TiDB Cloud (MySQL protocol + vector search) |
-| Ops | GitHub Actions, Docker, pytest, Wrangler |
+| AI | Google Gemini chat |
+| DB | TiDB Cloud (optional JSON cache) |
+| Ops | GitHub Actions, Docker (API), pytest |
 
 ## Quick start (local)
 
 ```bash
 cp .env.example .env
-# Set DATABASE_URL to TiDB Cloud SQLAlchemy string (mysql+asyncmy://...?ssl=true)
+# Optional: DATABASE_URL (TiDB mysql+asyncmy://...?ssl=true)
 # optional: GEMINI_API_KEY, SOLANA_RPC_URL; keep MOCK_ANALYZE=true for offline demo
 
 cd backend
@@ -74,7 +72,7 @@ Open http://localhost:3000 — API docs at http://localhost:8000/docs
 2. Apply [`render.yaml`](render.yaml) (service `chainlens-api`, Python, `rootDir: backend`, free plan).
    - If you already created a Web Service manually: set **Root Directory** to `backend`, build `pip install -r requirements.txt`, and **Start Command** to `uvicorn app.main:app --host 0.0.0.0 --port $PORT` (not the default `gunicorn your_application.wsgi`).
 3. In the service **Environment**, set:
-   - `DATABASE_URL` — TiDB `mysql+asyncmy://...?ssl=true`
+   - `DATABASE_URL` — optional TiDB `mysql+asyncmy://...?ssl=true`
    - `GEMINI_API_KEY` — optional if `MOCK_ANALYZE=true`
    - `GEMINI_MODEL` — optional; defaults to `gemini-3.8-flash`
    - Confirm `CORS_ORIGINS` includes `https://chainlens.ahmadmaulana.net`
@@ -105,7 +103,7 @@ Push to `main` runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and [
 
 | Name | Example |
 |------|---------|
-| `DATABASE_URL` | TiDB Cloud SQLAlchemy URL |
+| `DATABASE_URL` | TiDB Cloud SQLAlchemy URL (optional) |
 | `CORS_ORIGINS` | `https://chainlens.ahmadmaulana.net,https://chainlens-8or.pages.dev,http://localhost:3000` |
 | `MOCK_ANALYZE` | `true` |
 | `SOLANA_RPC_URL` | `https://api.mainnet-beta.solana.com` |
@@ -142,11 +140,7 @@ Alternative: Root directory `frontend`, build `npm ci && npm run build`, output 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Liveness |
-| GET | `/wallets/{address}/transactions` | Parsed timeline |
-| GET | `/wallets/{address}/balances` | SOL + SPL balances |
-| POST | `/wallets/{address}/summary` | AI summary |
 | POST | `/analyze` | Full dashboard payload |
-| GET | `/analyses/similar?q=` | Similar past analyses (TiDB vectors) |
 
 ```bash
 curl -s -X POST http://localhost:8000/analyze \
@@ -157,7 +151,7 @@ curl -s -X POST http://localhost:8000/analyze \
 ## Tests
 
 ```bash
-cd backend && pytest
+cd backend && pip install -r requirements-dev.txt && pytest
 ```
 
 ## Out of scope
@@ -166,6 +160,7 @@ cd backend && pytest
 - Full DEX IDL decoding
 - Auth / rate limits / Redis
 - Autonomous agents
+- Wallet Adapter / vector similarity UI
 - Paid AWS App Runner hosting
 
 ## License

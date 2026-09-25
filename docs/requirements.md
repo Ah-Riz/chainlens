@@ -7,10 +7,9 @@ Help Solana users understand wallet behavior without reading raw blockchain data
 ## User stories
 
 1. As a user, I want to paste a Solana address so I can analyze any wallet.
-2. As a user, I want to connect my wallet so I can analyze my own activity without typing an address.
-3. As a user, I want a transaction timeline so I can see recent activity in plain language.
-4. As a user, I want token balances so I can see what the wallet holds.
-5. As a user, I want an AI summary so I can understand patterns quickly.
+2. As a user, I want an activity mix of recent on-chain behavior so I can see what the wallet does without reading raw txs.
+3. As a user, I want token balances so I can see what the wallet holds.
+4. As a user, I want an AI summary so I can understand patterns quickly.
 
 ## Acceptance criteria (EARS)
 
@@ -19,10 +18,7 @@ Help Solana users understand wallet behavior without reading raw blockchain data
 3. WHEN Solana RPC fails THEN the system SHALL respond with HTTP 502 and a clear error detail.
 4. WHEN a wallet has no recent transactions THEN the system SHALL return HTTP 200 with empty transaction lists.
 5. WHEN `MOCK_ANALYZE=true` OR the Gemini key is missing/implausible THEN the system SHALL return a rule-based summary with `mock: true`.
-6. WHEN analysis completes with a live LLM THEN the system SHALL persist the summary embedding in TiDB Cloud (VECTOR).
-7. WHEN the user requests similar analyses AND embeddings exist THEN the system SHALL return top-k cosine matches.
-8. WHEN the primary Gemini model returns 503/429/UNAVAILABLE or a 404 “no longer available to new users” THEN the system SHALL try the configured fallback flash models and set `fallback_used` when a later model answers.
-9. IF Wallet Adapter connects successfully THEN the UI SHALL populate the address field with the connected pubkey.
+6. WHEN the primary Gemini model returns 503/429/UNAVAILABLE or a 404 “no longer available to new users” THEN the system SHALL try the configured fallback flash models and set `fallback_used` when a later model answers.
 
 ## Edge cases
 
@@ -30,6 +26,12 @@ Help Solana users understand wallet behavior without reading raw blockchain data
 - RPC rate limits / timeouts
 - Transactions with unknown programs (label as unknown, still include)
 - LLM timeout → fall back to rule-based summary when possible
+
+## Deferred (not MVP)
+
+- Wallet Adapter connect flow
+- Chronological per-transaction timeline UI
+- Similarity search / embedding persist in the product UI
 
 ## Out of scope
 

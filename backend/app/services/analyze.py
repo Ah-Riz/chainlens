@@ -9,21 +9,13 @@ from app.config import settings
 from app.schemas import (
     AnalyzeResponse,
     AnalyzeStats,
-    BalancesResponse,
-    NotableTransfer,
-    ProtocolInteraction,
-    StructuredAnalysis,
-    SummaryResponse,
     TokenBalance,
     TransactionItem,
-    TransactionsResponse,
-    WalletIntelligence,
 )
-from app.services.address import is_valid_solana_address, normalize_address
-from app.services.cache import upsert_analysis, upsert_transactions
-from app.services.embeddings import embed_text
+from app.services.address import is_valid_solana_address
+from app.services.cache import upsert_analysis
 from app.services.intelligence import classify_wallet
-from app.services.llm import llm_summarize
+from app.services.llm import llm_summarize, rule_based_summary
 from app.services.solana import SolanaRpc, decode_transaction, fetch_balances
 from app.services.solana.account_kind import (
     AccountClassification,
@@ -40,21 +32,17 @@ async def _persist_analysis(
     address: str,
     summary: str,
     stats: AnalyzeStats,
-    structured: StructuredAnalysis,
-    events: list[ActivityEvent],
+    structured,
 ) -> None:
     """Best-effort TiDB write — Analyze UX must not depend on DB availability."""
     try:
-        embedding = await embed_text(summary)
         await upsert_analysis(
             session,
             address,
             summary,
             stats.model_dump(),
             structured.model_dump(),
-            embedding,
         )
-        await upsert_transactions(session, address, events)
         await session.commit()
     except Exception:
         logger.exception("Failed to persist analysis for %s", address)
@@ -67,7 +55,7 @@ async def _persist_analysis(
 def _require_address(address: str) -> str:
     if not is_valid_solana_address(address):
         raise HTTPException(status_code=400, detail="Invalid Solana address")
-    return normalize_address(address)
+    return address.strip()
 
 
 def _events_to_items(events: list[ActivityEvent]) -> list[TransactionItem]:
@@ -129,121 +117,73 @@ async def _classify_address(address: str, rpc: SolanaRpc) -> AccountClassificati
 
 
 def _mock_response(address: str) -> AnalyzeResponse:
-    return AnalyzeResponse(
-        address=address,
-        summary=(
-            "This wallet reads as a trader with swap-heavy recent activity.\n"
-            "It swapped SOL for USDC via Jupiter, received SPL tokens, "
-            "and holds ~2.5 SOL plus 150 USDC.\n"
-            "(Mock — set MOCK_ANALYZE=false and configure SOLANA_RPC_URL + GEMINI_API_KEY.)"
-        ),
-        stats=AnalyzeStats(tx_count=12, unique_counterparties=5, protocols=["Jupiter", "SPL Token"]),
-        balances=[
-            TokenBalance(mint="So11111111111111111111111111111111111111112", symbol="SOL", amount="2.5", decimals=9),
-            TokenBalance(
-                mint="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-                symbol="USDC",
-                amount="150.00",
-                decimals=6,
-            ),
-        ],
-        transactions=[
-            TransactionItem(
-                signature="MockSig111111111111111111111111111111111111111111111111111111111",
-                type="SWAP_HINT",
-                description="Likely swap via Jupiter",
-                timestamp=1700000000,
-                programs=["Jupiter", "SPL Token"],
-            ),
-            TransactionItem(
-                signature="MockSig222222222222222222222222222222222222222222222222222222222",
-                type="SOL_TRANSFER",
-                description="received 1.0000 SOL",
-                timestamp=1699990000,
-                programs=["System Program"],
-            ),
-        ],
-        structured=StructuredAnalysis(
-            protocol_interactions=[
-                ProtocolInteraction(name="Jupiter", count=3),
-                ProtocolInteraction(name="SPL Token", count=5),
-            ],
-            notable_transfers=[
-                NotableTransfer(
-                    direction="in",
-                    asset="SOL",
-                    amount="1.0",
-                    counterparty_label="external wallet",
-                )
-            ],
-        ),
-        intelligence=WalletIntelligence(label="trader", signals=["swap_heavy"]),
-        account_kind="wallet",
-        owner_program="11111111111111111111111111111111",
-        owner_label="System Program",
-        what_is_this=what_is_this_for("wallet", None),
-        mock=True,
-        model=None,
-        fallback_used=False,
-    )
-
-
-async def get_transactions(address: str) -> TransactionsResponse:
-    normalized = _require_address(address)
-    if settings.mock_analyze:
-        mock = _mock_response(normalized)
-        return TransactionsResponse(address=normalized, transactions=mock.transactions)
-    events = await fetch_activity(normalized)
-    return TransactionsResponse(address=normalized, transactions=_events_to_items(events))
-
-
-async def get_balances(address: str) -> BalancesResponse:
-    normalized = _require_address(address)
-    if settings.mock_analyze:
-        mock = _mock_response(normalized)
-        return BalancesResponse(address=normalized, balances=mock.balances)
-    balances = await fetch_balances(normalized)
-    return BalancesResponse(address=normalized, balances=balances)
-
-
-async def summarize_wallet(address: str, session: AsyncSession | None = None) -> SummaryResponse:
-    normalized = _require_address(address)
-    if settings.mock_analyze:
-        mock = _mock_response(normalized)
-        return SummaryResponse(
-            address=normalized,
-            summary=mock.summary,
-            structured=mock.structured,
-            mock=True,
-            model=None,
-            fallback_used=False,
+    # ≥3 txs + DEX so classify_wallet → trader / swap_heavy
+    events = [
+        ActivityEvent(
+            signature=f"MockSig{i:064d}",
+            tx_type="SWAP_HINT",
+            description="Likely swap via Jupiter",
+            timestamp=1700000000 - i,
+            programs=["Jupiter", "SPL Token"],
+            counterparties=[f"Counter{i:043d}"],
         )
-    rpc = SolanaRpc()
-    acct = await _classify_address(normalized, rpc)
-    events = await fetch_activity(normalized, rpc)
-    balances = await fetch_balances(normalized, rpc)
+        for i in range(1, 4)
+    ] + [
+        ActivityEvent(
+            signature="MockSig0000000000000000000000000000000000000000000000000000000099",
+            tx_type="SOL_TRANSFER",
+            description="received 1.0000 SOL",
+            timestamp=1699990000,
+            programs=["System Program"],
+            counterparties=["Counter2222222222222222222222222222222222222"],
+        ),
+    ]
+    balances = [
+        TokenBalance(
+            mint="So11111111111111111111111111111111111111112",
+            symbol="SOL",
+            amount="2.5",
+            decimals=9,
+        ),
+        TokenBalance(
+            mint="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            symbol="USDC",
+            amount="150.00",
+            decimals=6,
+        ),
+    ]
     stats = _stats(events)
-    intelligence = classify_wallet(events, stats, balances, acct.kind)
-    summary, structured, mock, model, fallback_used = await llm_summarize(
-        normalized,
+    what = what_is_this_for("wallet", None)
+    intelligence = classify_wallet(events, stats, balances, "wallet")
+    summary, structured = rule_based_summary(
+        address,
         events,
         stats.protocols,
         stats,
         balances,
         intelligence,
-        account_kind=acct.kind,
-        owner_label=acct.owner_label,
-        what_is_this=acct.what_is_this,
+        account_kind="wallet",
+        what_is_this=what,
     )
-    if session is not None:
-        await _persist_analysis(session, normalized, summary, stats, structured, events)
-    return SummaryResponse(
-        address=normalized,
+    summary = (
+        f"{summary}\n"
+        "(Mock — set MOCK_ANALYZE=false and configure SOLANA_RPC_URL + GEMINI_API_KEY.)"
+    )
+    return AnalyzeResponse(
+        address=address,
         summary=summary,
+        stats=stats,
+        balances=balances,
+        transactions=_events_to_items(events),
         structured=structured,
-        mock=mock,
-        model=model,
-        fallback_used=fallback_used,
+        intelligence=intelligence,
+        account_kind="wallet",
+        owner_program="11111111111111111111111111111111",
+        owner_label="System Program",
+        what_is_this=what,
+        mock=True,
+        model=None,
+        fallback_used=False,
     )
 
 
@@ -272,7 +212,7 @@ async def analyze_wallet(address: str, session: AsyncSession | None = None) -> A
     )
 
     if session is not None:
-        await _persist_analysis(session, normalized, summary, stats, structured, events)
+        await _persist_analysis(session, normalized, summary, stats, structured)
 
     return AnalyzeResponse(
         address=normalized,

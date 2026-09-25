@@ -13,7 +13,3 @@ def is_valid_solana_address(address: str) -> bool:
     except Exception:
         return False
     return len(raw) == 32
-
-
-def normalize_address(address: str) -> str:
-    return address.strip()

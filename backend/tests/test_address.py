@@ -1,4 +1,4 @@
-from app.services.address import is_valid_solana_address, normalize_address
+from app.services.address import is_valid_solana_address
 
 # Well-known Solana system program — valid 32-byte pubkey
 SYSTEM_PROGRAM = "11111111111111111111111111111111"
@@ -16,5 +16,5 @@ def test_rejects_short() -> None:
     assert not is_valid_solana_address("abc")
 
 
-def test_normalize_strips() -> None:
-    assert normalize_address(f"  {SYSTEM_PROGRAM}  ") == SYSTEM_PROGRAM
+def test_strips_whitespace_for_validation() -> None:
+    assert is_valid_solana_address(f"  {SYSTEM_PROGRAM}  ")

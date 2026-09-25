@@ -2,18 +2,18 @@
 
 ## Goal
 
-Solana wallet intelligence: RPC → parse instructions → structured activity → LLM explanation → TiDB Cloud vector history.
+Solana wallet intelligence: RPC → parse instructions → structured activity → LLM explanation. Optional best-effort TiDB JSON cache when `DATABASE_URL` is set.
 
 ## Pipeline
 
 ```mermaid
 flowchart LR
-  UI[Next.js + Wallet Adapter] --> API[FastAPI]
+  UI[Next.js paste address] --> API[FastAPI]
   API --> RPC[Solana JSON-RPC]
   RPC --> Parser[Instruction decoder]
   Parser --> Pipeline[Structured activity]
   Pipeline --> LLM[Gemini summary]
-  Pipeline --> Store[(TiDB Cloud + vectors)]
+  Pipeline --> Store[(TiDB Cloud optional)]
   LLM --> Store
   Store --> API
   API --> UI
@@ -23,12 +23,12 @@ flowchart LR
 
 | Component | Responsibility |
 |-----------|----------------|
-| Frontend | Address input, Wallet Adapter, dashboard (Cloudflare Pages) |
-| `POST /analyze` | Orchestrate fetch → parse → LLM → persist |
+| Frontend | Paste address, dashboard (Cloudflare Pages) |
+| `POST /analyze` | Orchestrate fetch → parse → LLM → optional persist |
 | Solana RPC client | Signatures, txs (`jsonParsed`), balances |
 | Decoder | SPL transfers, program labels, activity events |
-| LLM + embeddings | Narrative summary; vector store for similarity |
-| TiDB Cloud | Cache analyses + txs; VECTOR cosine search |
+| LLM | Narrative / structured summary (Gemini + rule-based fallback) |
+| TiDB Cloud | Best-effort JSON cache of analyses (optional) |
 
 ## Deploy
 
@@ -36,8 +36,7 @@ flowchart LR
 |-------|------|
 | Frontend | Cloudflare Pages — https://chainlens.ahmadmaulana.net |
 | API | Render free Web Service (`render.yaml`) |
-| API (optional mock) | Cloudflare Worker |
-| DB | TiDB Cloud Starter |
+| DB | TiDB Cloud Starter (optional) |
 
 
 ## Error handling
@@ -51,4 +50,4 @@ flowchart LR
 
 ## Non-goals
 
-Multi-chain, agents, Redis, Alembic, full DEX IDL decoding.
+Multi-chain, agents, Redis, Alembic, full DEX IDL decoding, Wallet Adapter, vector similarity search.

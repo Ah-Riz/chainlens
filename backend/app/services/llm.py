@@ -28,14 +28,8 @@ _AMOUNT_RE = re.compile(
 
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 
-# Never include gemini-2.5-* or gemini-2.0-* (often 404 for new users).
-_FALLBACK_MODELS = (
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
-)
+# One fallback only — never gemini-2.5-* / gemini-2.0-* (often 404 for new users).
+_FALLBACK_MODEL = "gemini-3.7-flash"
 
 
 def is_plausible_gemini_key(key: str) -> bool:
@@ -208,13 +202,10 @@ def _analyst_brief(
 
 
 def _models_to_try(primary: str) -> list[str]:
-    seen: set[str] = set()
-    ordered: list[str] = []
-    for m in (primary, *_FALLBACK_MODELS):
-        if m and m not in seen:
-            seen.add(m)
-            ordered.append(m)
-    return ordered
+    models = [primary]
+    if _FALLBACK_MODEL and _FALLBACK_MODEL != primary:
+        models.append(_FALLBACK_MODEL)
+    return models
 
 
 def _exception_status_and_text(exc: BaseException) -> tuple[int | None, str]:

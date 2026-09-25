@@ -130,10 +130,3 @@ def decode_transaction(
         counterparties=list(counterparties),
         raw={"program_ids": list(dict.fromkeys(program_ids))},
     )
-
-
-def decode_many(
-    pairs: list[tuple[str, dict[str, Any] | None]],
-    wallet: str,
-) -> list[ActivityEvent]:
-    return [decode_transaction(sig, tx, wallet) for sig, tx in pairs]
