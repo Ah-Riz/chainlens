@@ -11,7 +11,8 @@ services:
       - .env
     environment:
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.mainnet-beta.solana.com}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       MOCK_ANALYZE: ${MOCK_ANALYZE:-true}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       DATABASE_URL: ${DATABASE_URL}

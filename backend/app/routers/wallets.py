@@ -74,7 +74,7 @@ async def analyses_similar(
         if embedding is None:
             raise HTTPException(
                 status_code=503,
-                detail="Embeddings unavailable (set OPENAI_API_KEY and MOCK_ANALYZE=false)",
+                detail="Embeddings unavailable (set GEMINI_API_KEY and MOCK_ANALYZE=false)",
             )
 
     items = await similar_analyses(session, embedding, limit=min(limit, 20), exclude_address=exclude)

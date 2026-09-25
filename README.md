@@ -32,7 +32,7 @@ Wallet address
   → Solana RPC (signatures + txs + balances)
   → instruction decoder
   → TiDB Cloud (JSON + VECTOR)
-  → OpenAI structured summary
+  → Gemini structured summary
   → FastAPI (Render) → Next.js (Cloudflare Pages)
 ```
 
@@ -43,7 +43,7 @@ Wallet address
 | Frontend | Next.js (static export), TypeScript, Tailwind, Wallet Adapter → Cloudflare Pages |
 | Backend | Python, FastAPI → Render (free Web Service) |
 | Chain | Solana JSON-RPC |
-| AI | OpenAI chat + embeddings |
+| AI | Google Gemini chat + embeddings |
 | DB | TiDB Cloud (MySQL protocol + vector search) |
 | Ops | GitHub Actions, Docker, pytest, Wrangler |
 
@@ -52,7 +52,7 @@ Wallet address
 ```bash
 cp .env.example .env
 # Set DATABASE_URL to TiDB Cloud SQLAlchemy string (mysql+asyncmy://...?ssl=true)
-# optional: OPENAI_API_KEY, SOLANA_RPC_URL; keep MOCK_ANALYZE=true for offline demo
+# optional: GEMINI_API_KEY, SOLANA_RPC_URL; keep MOCK_ANALYZE=true for offline demo
 
 cd backend
 python -m venv .venv && source .venv/bin/activate
@@ -75,7 +75,8 @@ Open http://localhost:3000 — API docs at http://localhost:8000/docs
    - If you already created a Web Service manually: set **Root Directory** to `backend`, build `pip install -r requirements.txt`, and **Start Command** to `uvicorn app.main:app --host 0.0.0.0 --port $PORT` (not the default `gunicorn your_application.wsgi`).
 3. In the service **Environment**, set:
    - `DATABASE_URL` — TiDB `mysql+asyncmy://...?ssl=true`
-   - `OPENAI_API_KEY` — optional if `MOCK_ANALYZE=true`
+   - `GEMINI_API_KEY` — optional if `MOCK_ANALYZE=true`
+   - `GEMINI_MODEL` — optional; defaults to `gemini-3.8-flash`
    - Confirm `CORS_ORIGINS` includes `https://chainlens.ahmadmaulana.net`
 4. Copy the service URL (`https://….onrender.com`).
 5. Free tier **spins down when idle** — first request after idle can take ~30–60s.
@@ -108,7 +109,8 @@ Push to `main` runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and [
 | `CORS_ORIGINS` | `https://chainlens.ahmadmaulana.net,https://chainlens-8or.pages.dev,http://localhost:3000` |
 | `MOCK_ANALYZE` | `true` |
 | `SOLANA_RPC_URL` | `https://api.mainnet-beta.solana.com` |
-| `OPENAI_API_KEY` | optional |
+| `GEMINI_API_KEY` | optional (AI Studio key, usually `AIza…`) |
+| `GEMINI_MODEL` | optional; default `gemini-3.8-flash` |
 
 ### Custom domain DNS (`chainlens.ahmadmaulana.net`)
 

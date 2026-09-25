@@ -21,9 +21,8 @@ class Settings(BaseSettings):
 
     solana_rpc_url: str = "https://api.mainnet-beta.solana.com"
     tx_fetch_limit: int = 40
-    openai_api_key: str = ""
-    llm_model: str = "gpt-4o-mini"
-    embedding_model: str = "text-embedding-3-small"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.8-flash"
     database_url: str = "mysql+asyncmy://root@127.0.0.1:4000/chainlens"
     cors_origins: str = "http://localhost:3000"
     mock_analyze: bool = True

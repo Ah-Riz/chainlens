@@ -6,6 +6,12 @@ export function AiInsights({ result }: { result: AnalyzeResponse }) {
     <section className="panel reveal sm:col-span-2" style={{ animationDelay: "100ms" }}>
       <h2 className="mb-3 font-display text-xl font-semibold tracking-[-0.02em]">AI insights</h2>
       <p className="whitespace-pre-line text-base leading-relaxed text-ink">{result.summary}</p>
+      {result.model && (
+        <p className="mt-2 font-mono text-[11px] text-muted">
+          This response is using {result.model}.
+          {result.fallback_used ? " (fallback)" : ""}
+        </p>
+      )}
       {transfers.length > 0 && (
         <ul className="mt-4 space-y-1.5">
           {transfers.map((t, i) => (

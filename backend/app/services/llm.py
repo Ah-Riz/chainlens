@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Any
 
-from openai import AsyncOpenAI
+from google import genai
+from google.genai import types
 
 from app.config import settings
 from app.schemas import (
@@ -17,10 +19,28 @@ from app.schemas import (
 )
 from app.services.solana.decoder import ActivityEvent
 
+logger = logging.getLogger(__name__)
+
 _AMOUNT_RE = re.compile(
     r"(sent|received|transferred)\s+([\d.]+)\s+(\w+)",
     re.IGNORECASE,
 )
+
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+
+# Never include gemini-2.5-* or gemini-2.0-* (often 404 for new users).
+_FALLBACK_MODELS = (
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+)
+
+
+def is_plausible_gemini_key(key: str) -> bool:
+    """Google AI Studio keys usually start with AIza."""
+    return bool(key) and key.startswith("AIza")
 
 
 def _protocol_counts(events: list[ActivityEvent], protocols: list[str]) -> list[ProtocolInteraction]:
@@ -187,6 +207,58 @@ def _analyst_brief(
     }
 
 
+def _models_to_try(primary: str) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for m in (primary, *_FALLBACK_MODELS):
+        if m and m not in seen:
+            seen.add(m)
+            ordered.append(m)
+    return ordered
+
+
+def _exception_status_and_text(exc: BaseException) -> tuple[int | None, str]:
+    status: int | None = None
+    for attr in ("status_code", "code"):
+        raw = getattr(exc, attr, None)
+        if isinstance(raw, int):
+            status = raw
+            break
+    parts = [str(exc)]
+    resp = getattr(exc, "response", None)
+    if resp is not None:
+        resp_status = getattr(resp, "status_code", None)
+        if isinstance(resp_status, int):
+            status = resp_status
+        parts.append(str(getattr(resp, "text", "") or ""))
+    msg = getattr(exc, "message", None)
+    if msg:
+        parts.append(str(msg))
+    return status, " ".join(parts)
+
+
+def _is_retryable_model_error(exc: BaseException) -> bool:
+    """Retry on capacity / unavailable / new-user 404; not on auth or other hard failures."""
+    status, text = _exception_status_and_text(exc)
+    lower = text.lower()
+    if status in (429, 503):
+        return True
+    if "unavailable" in lower or "high demand" in lower or "resource_exhausted" in lower:
+        return True
+    if status == 404 and "no longer available to new users" in lower:
+        return True
+    if "no longer available to new users" in lower:
+        return True
+    return False
+
+
+def _parse_llm_json(raw: str) -> dict[str, Any]:
+    data = json.loads(raw or "{}")
+    if not isinstance(data, dict):
+        raise ValueError("LLM JSON root must be an object")
+    return data
+
+
 async def llm_summarize(
     address: str,
     events: list[ActivityEvent],
@@ -197,8 +269,8 @@ async def llm_summarize(
     account_kind: str = "wallet",
     owner_label: str | None = None,
     what_is_this: str | None = None,
-) -> tuple[str, StructuredAnalysis, bool]:
-    """Return summary, structured, mock_flag."""
+) -> tuple[str, StructuredAnalysis, bool, str | None, bool]:
+    """Return summary, structured, mock_flag, model, fallback_used."""
     kwargs = dict(
         stats=stats,
         balances=balances,
@@ -207,9 +279,9 @@ async def llm_summarize(
         owner_label=owner_label,
         what_is_this=what_is_this,
     )
-    if settings.mock_analyze or not settings.openai_api_key:
+    if settings.mock_analyze or not is_plausible_gemini_key(settings.gemini_api_key):
         summary, structured = rule_based_summary(address, events, protocols, **kwargs)
-        return summary, structured, True
+        return summary, structured, True, None, False
 
     system = (
         "You are ChainLens, a Solana address analyst for newcomers and crypto users. "
@@ -247,40 +319,63 @@ async def llm_summarize(
             },
         }
     )
+    contents = f"{system}\n\n{user}"
 
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
-    try:
-        res = await client.chat.completions.create(
-            model=settings.llm_model,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            temperature=0.2,
-        )
-        raw = res.choices[0].message.content or "{}"
-        data: dict[str, Any] = json.loads(raw)
-    except Exception:
-        summary, structured = rule_based_summary(address, events, protocols, **kwargs)
-        return summary, structured, True
+    primary = (settings.gemini_model or DEFAULT_GEMINI_MODEL).strip() or DEFAULT_GEMINI_MODEL
+    models = _models_to_try(primary)
+    client = genai.Client(api_key=settings.gemini_api_key)
+    config = types.GenerateContentConfig(
+        temperature=0.2,
+        response_mime_type="application/json",
+    )
 
-    interactions = [
-        ProtocolInteraction(name=str(i.get("name", "Unknown")), count=int(i.get("count", 1)))
-        for i in (data.get("protocol_interactions") or [])
-        if isinstance(i, dict)
-    ]
-    transfers = [
-        NotableTransfer(
-            direction=str(t.get("direction", "activity")),
-            asset=str(t.get("asset", "?")),
-            amount=str(t.get("amount", "?")),
-            counterparty_label=t.get("counterparty_label"),
-        )
-        for t in (data.get("notable_transfers") or [])
-        if isinstance(t, dict)
-    ]
-    summary = str(data.get("summary") or "").strip() or rule_based_summary(
-        address, events, protocols, **kwargs
-    )[0]
-    return summary, StructuredAnalysis(protocol_interactions=interactions, notable_transfers=transfers), False
+    last_exc: BaseException | None = None
+    for model in models:
+        try:
+            res = await client.aio.models.generate_content(
+                model=model,
+                contents=contents,
+                config=config,
+            )
+            raw = res.text or "{}"
+            data = _parse_llm_json(raw)
+        except Exception as exc:
+            last_exc = exc
+            if _is_retryable_model_error(exc):
+                logger.warning("Gemini model %s unavailable (%s); trying next", model, exc)
+                continue
+            logger.exception("Gemini generate_content failed for %s", model)
+            summary, structured = rule_based_summary(address, events, protocols, **kwargs)
+            return summary, structured, True, None, False
+        else:
+            interactions = [
+                ProtocolInteraction(name=str(i.get("name", "Unknown")), count=int(i.get("count", 1)))
+                for i in (data.get("protocol_interactions") or [])
+                if isinstance(i, dict)
+            ]
+            transfers = [
+                NotableTransfer(
+                    direction=str(t.get("direction", "activity")),
+                    asset=str(t.get("asset", "?")),
+                    amount=str(t.get("amount", "?")),
+                    counterparty_label=t.get("counterparty_label"),
+                )
+                for t in (data.get("notable_transfers") or [])
+                if isinstance(t, dict)
+            ]
+            summary = str(data.get("summary") or "").strip() or rule_based_summary(
+                address, events, protocols, **kwargs
+            )[0]
+            fallback_used = model != primary
+            return (
+                summary,
+                StructuredAnalysis(protocol_interactions=interactions, notable_transfers=transfers),
+                False,
+                model,
+                fallback_used,
+            )
+
+    if last_exc is not None:
+        logger.warning("All Gemini models failed; last error: %s", last_exc)
+    summary, structured = rule_based_summary(address, events, protocols, **kwargs)
+    return summary, structured, True, None, False

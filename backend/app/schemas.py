@@ -64,6 +64,8 @@ class AnalyzeResponse(BaseModel):
     owner_label: str | None = None
     what_is_this: str = "This looks like a wallet (user account)."
     mock: bool = False
+    model: str | None = None
+    fallback_used: bool = False
 
 
 class TransactionsResponse(BaseModel):
@@ -85,6 +87,8 @@ class SummaryResponse(BaseModel):
     summary: str
     structured: StructuredAnalysis
     mock: bool = False
+    model: str | None = None
+    fallback_used: bool = False
 
 
 class SimilarAnalysisItem(BaseModel):

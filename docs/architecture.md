@@ -12,7 +12,7 @@ flowchart LR
   API --> RPC[Solana JSON-RPC]
   RPC --> Parser[Instruction decoder]
   Parser --> Pipeline[Structured activity]
-  Pipeline --> LLM[OpenAI summary]
+  Pipeline --> LLM[Gemini summary]
   Pipeline --> Store[(TiDB Cloud + vectors)]
   LLM --> Store
   Store --> API

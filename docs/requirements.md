@@ -18,10 +18,11 @@ Help Solana users understand wallet behavior without reading raw blockchain data
 2. WHEN the user submits an invalid address THEN the system SHALL respond with HTTP 400.
 3. WHEN Solana RPC fails THEN the system SHALL respond with HTTP 502 and a clear error detail.
 4. WHEN a wallet has no recent transactions THEN the system SHALL return HTTP 200 with empty transaction lists.
-5. WHEN `MOCK_ANALYZE=true` OR the OpenAI key is missing THEN the system SHALL return a rule-based summary with `mock: true`.
-6. WHEN analysis completes with a live LLM THEN the system SHALL persist the summary embedding in Postgres (pgvector).
+5. WHEN `MOCK_ANALYZE=true` OR the Gemini key is missing/implausible THEN the system SHALL return a rule-based summary with `mock: true`.
+6. WHEN analysis completes with a live LLM THEN the system SHALL persist the summary embedding in TiDB Cloud (VECTOR).
 7. WHEN the user requests similar analyses AND embeddings exist THEN the system SHALL return top-k cosine matches.
-8. IF Wallet Adapter connects successfully THEN the UI SHALL populate the address field with the connected pubkey.
+8. WHEN the primary Gemini model returns 503/429/UNAVAILABLE or a 404 “no longer available to new users” THEN the system SHALL try the configured fallback flash models and set `fallback_used` when a later model answers.
+9. IF Wallet Adapter connects successfully THEN the UI SHALL populate the address field with the connected pubkey.
 
 ## Edge cases
 

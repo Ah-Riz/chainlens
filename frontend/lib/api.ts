@@ -42,6 +42,8 @@ export type AnalyzeResponse = {
   owner_label: string | null;
   what_is_this: string;
   mock: boolean;
+  model: string | null;
+  fallback_used: boolean;
 };
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "");

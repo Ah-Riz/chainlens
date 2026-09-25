@@ -135,7 +135,7 @@ def _mock_response(address: str) -> AnalyzeResponse:
             "This wallet reads as a trader with swap-heavy recent activity.\n"
             "It swapped SOL for USDC via Jupiter, received SPL tokens, "
             "and holds ~2.5 SOL plus 150 USDC.\n"
-            "(Mock — set MOCK_ANALYZE=false and configure SOLANA_RPC_URL + OPENAI_API_KEY.)"
+            "(Mock — set MOCK_ANALYZE=false and configure SOLANA_RPC_URL + GEMINI_API_KEY.)"
         ),
         stats=AnalyzeStats(tx_count=12, unique_counterparties=5, protocols=["Jupiter", "SPL Token"]),
         balances=[
@@ -183,6 +183,8 @@ def _mock_response(address: str) -> AnalyzeResponse:
         owner_label="System Program",
         what_is_this=what_is_this_for("wallet", None),
         mock=True,
+        model=None,
+        fallback_used=False,
     )
 
 
@@ -213,6 +215,8 @@ async def summarize_wallet(address: str, session: AsyncSession | None = None) ->
             summary=mock.summary,
             structured=mock.structured,
             mock=True,
+            model=None,
+            fallback_used=False,
         )
     rpc = SolanaRpc()
     acct = await _classify_address(normalized, rpc)
@@ -220,7 +224,7 @@ async def summarize_wallet(address: str, session: AsyncSession | None = None) ->
     balances = await fetch_balances(normalized, rpc)
     stats = _stats(events)
     intelligence = classify_wallet(events, stats, balances, acct.kind)
-    summary, structured, mock = await llm_summarize(
+    summary, structured, mock, model, fallback_used = await llm_summarize(
         normalized,
         events,
         stats.protocols,
@@ -233,7 +237,14 @@ async def summarize_wallet(address: str, session: AsyncSession | None = None) ->
     )
     if session is not None:
         await _persist_analysis(session, normalized, summary, stats, structured, events)
-    return SummaryResponse(address=normalized, summary=summary, structured=structured, mock=mock)
+    return SummaryResponse(
+        address=normalized,
+        summary=summary,
+        structured=structured,
+        mock=mock,
+        model=model,
+        fallback_used=fallback_used,
+    )
 
 
 async def analyze_wallet(address: str, session: AsyncSession | None = None) -> AnalyzeResponse:
@@ -248,7 +259,7 @@ async def analyze_wallet(address: str, session: AsyncSession | None = None) -> A
     balances = await fetch_balances(normalized, rpc)
     stats = _stats(events)
     intelligence = classify_wallet(events, stats, balances, acct.kind)
-    summary, structured, mock = await llm_summarize(
+    summary, structured, mock, model, fallback_used = await llm_summarize(
         normalized,
         events,
         stats.protocols,
@@ -276,4 +287,6 @@ async def analyze_wallet(address: str, session: AsyncSession | None = None) -> A
         owner_label=acct.owner_label,
         what_is_this=acct.what_is_this,
         mock=mock,
+        model=model,
+        fallback_used=fallback_used,
     )
