@@ -35,8 +35,8 @@ flowchart LR
 | Layer | Host |
 |-------|------|
 | Frontend | Cloudflare Pages — https://chainlens.ahmadmaulana.net |
-| API | Render free Web Service (`render.yaml`) |
-| DB | TiDB Cloud Starter (optional) |
+| API | Render free Web Service — https://chainlens-fok6.onrender.com (`render.yaml`) |
+| DB | TiDB Cloud Starter (optional JSON cache) |
 
 
 ## Error handling

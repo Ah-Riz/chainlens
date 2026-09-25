@@ -1,6 +1,10 @@
 # ChainLens — AI-powered Solana wallet intelligence
 
+[![CI](https://github.com/Ah-Riz/chainlens/actions/workflows/ci.yml/badge.svg)](https://github.com/Ah-Riz/chainlens/actions/workflows/ci.yml)
+
 Portfolio MVP: Solana RPC → instruction parsing → LLM explanations → optional TiDB JSON cache.
+
+**Live:** [Frontend](https://chainlens.ahmadmaulana.net) · [API `/health`](https://chainlens-fok6.onrender.com/health)
 
 ## Live URLs
 
@@ -8,18 +12,50 @@ Portfolio MVP: Solana RPC → instruction parsing → LLM explanations → optio
 |---------|-----|
 | Frontend (custom domain) | https://chainlens.ahmadmaulana.net |
 | Frontend (Cloudflare Pages) | https://chainlens-8or.pages.dev |
-| API (Render free Web Service) | `https://chainlens-api-….onrender.com` (set after first Render deploy) |
+| API (Render free Web Service) | https://chainlens-fok6.onrender.com |
+| API health | https://chainlens-fok6.onrender.com/health |
+
+Frontend build embeds the API base from GitHub variable `NEXT_PUBLIC_API_URL` (currently the Render URL above).
 
 ## Recruiter takeaway
 
 > Understands Solana data, builds LLM product features, ships a full-stack MVP.
 
+Honest framing: this is a **portfolio MVP**, not production SaaS. Render free tier **cold-starts ~30–60s** after idle.
+
+## Try it
+
+1. Optionally warm the API (avoids a cold first click): `./scripts/warmup.sh` or open [/health](https://chainlens-fok6.onrender.com/health).
+2. Open https://chainlens.ahmadmaulana.net
+3. Click the **Example address** link (`DYw8…NSKK`) → **Analyze**
+4. Expect dashboard sections: **Overview**, **AI insights**, **Token balances**, **Activity mix** / transaction timeline
+
+![Successful analyze of the example address](docs/assets/analyze-success.png)
+
+If the first request stalls, wait ~30–60s for Render wake-up, then retry. Warm-up:
+
+```bash
+./scripts/warmup.sh
+# or: curl -fsS -m 90 https://chainlens-fok6.onrender.com/health
+```
+
+## Mock vs Gemini (honest)
+
+| Mode | When | What you get |
+|------|------|----------------|
+| Rule-based | `MOCK_ANALYZE=true`, **or** missing/implausible `GEMINI_API_KEY` | Real Solana RPC fetch + rule-based narrative; UI badge **Rule-based summary** (`mock: true`) |
+| Gemini | `MOCK_ANALYZE=false` **and** valid AI Studio key | Real RPC + Gemini structured summary; AI insights may show the model name |
+
+- **CI** forces `MOCK_ANALYZE=true` so tests never call Gemini.
+- **Production blueprint** ([`render.yaml`](render.yaml)) sets `MOCK_ANALYZE=false`; Gemini runs only when `GEMINI_API_KEY` is set on Render.
+- Live demo may show the rule-based badge if the key is unset — on-chain data is still real.
+
 ## What it does
 
-- Paste a Solana address
+- Paste a Solana address (wallet, program, token, or vault)
 - Fetch recent transactions via Solana JSON-RPC (`jsonParsed`)
 - Decode SPL transfers and common program interactions
-- Show activity mix, balances, and natural-language wallet summaries
+- Show activity mix, balances, and natural-language summaries
 - Optionally cache analyses in TiDB Cloud when `DATABASE_URL` is set
 
 ## Architecture
@@ -30,8 +66,9 @@ See [docs/architecture.md](docs/architecture.md) and [docs/requirements.md](docs
 Wallet address
   → Solana RPC (signatures + txs + balances)
   → instruction decoder
-  → Gemini structured summary (or rule-based mock)
+  → Gemini structured summary (or rule-based fallback)
   → FastAPI (Render) → Next.js (Cloudflare Pages)
+  → optional TiDB JSON cache
 ```
 
 ## Stack
@@ -41,7 +78,7 @@ Wallet address
 | Frontend | Next.js (static export), TypeScript, Tailwind → Cloudflare Pages |
 | Backend | Python, FastAPI → Render (free Web Service) |
 | Chain | Solana JSON-RPC |
-| AI | Google Gemini chat |
+| AI | Google Gemini chat (+ rule-based fallback) |
 | DB | TiDB Cloud (optional JSON cache) |
 | Ops | GitHub Actions, Docker (API), pytest |
 
@@ -50,7 +87,8 @@ Wallet address
 ```bash
 cp .env.example .env
 # Optional: DATABASE_URL (TiDB mysql+asyncmy://...?ssl=true)
-# optional: GEMINI_API_KEY, SOLANA_RPC_URL; keep MOCK_ANALYZE=true for offline demo
+# Optional: GEMINI_API_KEY, SOLANA_RPC_URL
+# Offline / no Gemini: MOCK_ANALYZE=true
 
 cd backend
 python -m venv .venv && source .venv/bin/activate
@@ -73,11 +111,11 @@ Open http://localhost:3000 — API docs at http://localhost:8000/docs
    - If you already created a Web Service manually: set **Root Directory** to `backend`, build `pip install -r requirements.txt`, and **Start Command** to `uvicorn app.main:app --host 0.0.0.0 --port $PORT` (not the default `gunicorn your_application.wsgi`).
 3. In the service **Environment**, set:
    - `DATABASE_URL` — optional TiDB `mysql+asyncmy://...?ssl=true`
-   - `GEMINI_API_KEY` — optional if `MOCK_ANALYZE=true`
+   - `GEMINI_API_KEY` — required for live Gemini (AI Studio key, typically starts with `AIza`)
    - `GEMINI_MODEL` — optional; defaults to `gemini-3.8-flash`
    - Confirm `CORS_ORIGINS` includes `https://chainlens.ahmadmaulana.net`
-4. Copy the service URL (`https://….onrender.com`).
-5. Free tier **spins down when idle** — first request after idle can take ~30–60s.
+4. Note the service URL (live: https://chainlens-fok6.onrender.com) and set GitHub `NEXT_PUBLIC_API_URL` to match.
+5. Free tier **spins down when idle** — first request after idle can take ~30–60s. Use [`scripts/warmup.sh`](scripts/warmup.sh) before demos.
 
 Auto-deploy on push to `main` is enabled in the Blueprint. Optional GitHub secret `RENDER_DEPLOY_HOOK` triggers an extra deploy from Actions.
 
@@ -95,20 +133,20 @@ Push to `main` runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and [
 
 ### GitHub Variables
 
-| Name | Example |
-|------|---------|
-| `NEXT_PUBLIC_API_URL` | `https://chainlens-api-xxxx.onrender.com` (your Render URL) |
+| Name | Value (this repo) |
+|------|-------------------|
+| `NEXT_PUBLIC_API_URL` | `https://chainlens-fok6.onrender.com` |
 
 ### Render environment (dashboard)
 
-| Name | Example |
-|------|---------|
+| Name | Notes |
+|------|-------|
 | `DATABASE_URL` | TiDB Cloud SQLAlchemy URL (optional) |
 | `CORS_ORIGINS` | `https://chainlens.ahmadmaulana.net,https://chainlens-8or.pages.dev,http://localhost:3000` |
-| `MOCK_ANALYZE` | `true` |
+| `MOCK_ANALYZE` | Blueprint default `false`; set `true` only for demo without Gemini |
 | `SOLANA_RPC_URL` | `https://api.mainnet-beta.solana.com` |
-| `GEMINI_API_KEY` | optional (AI Studio key, usually `AIza…`) |
-| `GEMINI_MODEL` | optional; default `gemini-3.8-flash` |
+| `GEMINI_API_KEY` | AI Studio key (typically starts with `AIza`); omit → rule-based summary |
+| `GEMINI_MODEL` | Optional; default `gemini-3.8-flash` |
 
 ### Custom domain DNS (`chainlens.ahmadmaulana.net`)
 
@@ -124,7 +162,7 @@ Monorepo: Next app is under `frontend/`. Prefer **empty** Root directory and bui
 | **Framework preset** | None |
 | **Build command** | `npm run pages:build` |
 | **Build output directory** | `frontend/out` |
-| **Env** `NEXT_PUBLIC_API_URL` | your Render `https://….onrender.com` |
+| **Env** `NEXT_PUBLIC_API_URL` | `https://chainlens-fok6.onrender.com` |
 
 Alternative: Root directory `frontend`, build `npm ci && npm run build`, output `out`.
 
@@ -132,7 +170,7 @@ Alternative: Root directory `frontend`, build `npm ci && npm run build`, output 
 
 1. Create Render service from Blueprint; set env; wait until live.
 2. Set GitHub `NEXT_PUBLIC_API_URL` to the Render HTTPS URL (Actions) **and/or** the same var in Pages → Settings → Environment variables.
-3. Ensure Cloudflare Pages **Root directory** is `frontend`, then redeploy.
+3. Ensure Cloudflare Pages **Root directory** is `frontend` (or empty + `npm run pages:build`), then redeploy.
 4. Optional: GitHub Actions Deploy with `CLOUDFLARE_*` secrets also publishes Pages via Wrangler.
 
 ## API
@@ -143,9 +181,9 @@ Alternative: Root directory `frontend`, build `npm ci && npm run build`, output 
 | POST | `/analyze` | Full dashboard payload |
 
 ```bash
-curl -s -X POST http://localhost:8000/analyze \
+curl -s -X POST https://chainlens-fok6.onrender.com/analyze \
   -H 'Content-Type: application/json' \
-  -d '{"address":"11111111111111111111111111111111"}'
+  -d '{"address":"DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK"}'
 ```
 
 ## Tests
@@ -154,6 +192,8 @@ curl -s -X POST http://localhost:8000/analyze \
 cd backend && pip install -r requirements-dev.txt && pytest
 ```
 
+CI runs the same backend suite with `MOCK_ANALYZE=true` on every push/PR to `main`.
+
 ## Out of scope
 
 - Multi-chain
@@ -161,6 +201,7 @@ cd backend && pip install -r requirements-dev.txt && pytest
 - Auth / rate limits / Redis
 - Autonomous agents
 - Wallet Adapter / vector similarity UI
+- Failed-transaction debugger (keep this product as address/activity intelligence)
 - Paid AWS App Runner hosting
 
 ## License
